@@ -1,14 +1,18 @@
+import NativeItemKindsStep from "./steps/nativeItemKindsStep";
 import { Artifacts } from "./steps/stepInterface";
 import WorkflowIntroductionStep from "./steps/workflowIntroStep";
 
-export function runCreateVulcanWorkflow() {
+export async function runCreateVulcanWorkflow() {
   const data: {artifacts: Artifacts} = {artifacts: {}};
-  const steps = [ WorkflowIntroductionStep]
-
-  steps.forEach(async (stepClass) => {
+  const steps = [ 
+    WorkflowIntroductionStep,
+    NativeItemKindsStep
+  ]
+  
+  for (const stepClass of steps) {
     const step = new stepClass(data.artifacts);
-    data.artifacts = await step.execute()
-  })
+    data.artifacts = await step.execute();
+  }
 }
 
 runCreateVulcanWorkflow();

@@ -12,6 +12,7 @@ export type Prompt = {
     handler?: () => void; // Optional handler function for custom processing
     answer?: string; // Optional field to store the answer
     recursive?: boolean; // Optional field to indicate if the prompt is recursive
+    required?: boolean
 }
 
 export type Outcome<T> = (data: string) => Promise<T>;

@@ -22,15 +22,31 @@ export default class WorkflowIntroductionStep extends BaseStep implements StepIn
   private workflowNameRecieved() {
     this.createVulcanAdpaterInstanceFile()
     this.artifacts['workflowName'] = this.workflowName();
-    console.log("Adpater instance file created at: ", FilePaths.VulcanAdapterInstance);
+    this.logger().adapterFileCreated()
   }
 
   private registerUnifiedQueueSubsystem() {
-    const fileContent = fs.readFileSync(FilePaths.VulcanAdapterClass, 'utf-8');
-    const updatedContent = addVariantToHaskellDataType(fileContent, 'UnifiedQueueSubsystem', `UnifiedQueue${this.workflowName()}Subsystem`);
-    fs.writeFileSync(FilePaths.VulcanAdapterClass, updatedContent);
-    this.artifacts['unifiedQueueSubsystemName'] = `UnifiedQueue${this.workflowName()}Subsystem`;
-    console.log(`Updated UnifiedQueueSubsystem with new subsystem: UnifiedQueue${this.workflowName()}Subsystem in file ${FilePaths.VulcanAdapterClass}`);
+    const fileContent = fs.readFileSync(FilePaths.VulcanAdapterClass, 'utf-8'),
+          subsystemName = this.subsystemName();
+
+    if (!fileContent.includes(subsystemName)) {
+      const updatedContent = addVariantToHaskellDataType(fileContent, 'UnifiedQueueSubsystem', subsystemName);
+      fs.writeFileSync(FilePaths.VulcanAdapterClass, updatedContent);
+      this.artifacts['unifiedQueueSubsystemName'] = subsystemName;
+    }
+
+    this.logger().subsystemAdded()
+  }
+
+  private logger() {
+    return {
+      adapterFileCreated: () => console.log("🚀 Adpater instance file created at: ", FilePaths.VulcanAdapterInstance),
+      subsystemAdded: () => console.log(`🚀 Updated UnifiedQueueSubsystem with new subsystem: UnifiedQueue${this.workflowName()}Subsystem in file ${FilePaths.VulcanAdapterClass}`)
+    }
+  }
+
+  private subsystemName() {
+    return `UnifiedQueue${this.workflowName()}Subsystem`;
   }
 
   private workflowName () {

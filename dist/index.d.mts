@@ -1,3 +1,3 @@
-declare function runCreateVulcanWorkflow(): void;
+declare function runCreateVulcanWorkflow(): Promise<void>;
 
 export { runCreateVulcanWorkflow };

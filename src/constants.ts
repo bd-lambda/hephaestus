@@ -5,3 +5,9 @@ export const FilePaths = {
 }
 
 export const NativeItemKindsSuffix = 'ItemType';
+
+export const NativeItemKindsTargetMarker = 'deriving stock';
+
+export const TabSize = 2;
+
+export const NativeItemKindJSONMarker = '(deriveJSONAndTypeScript mercuryDefaultOptions'

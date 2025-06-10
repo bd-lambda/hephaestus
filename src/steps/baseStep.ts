@@ -23,20 +23,22 @@ export default class BaseStep implements StepInterface {
       name: prompt.id,
       message: prompt.message,
     })
+    const answer = response[prompt.id].trim();
+
+    if (answer === ':exit') return
     
-    if (response[prompt.id] === undefined) {
+    if (prompt.required && answer === undefined) {
       throw new Error(`No response provided for prompt: ${prompt.id}`);
     }
 
-    if (typeof response[prompt.id] !== 'string') {
-      throw new Error(`Response for prompt ${prompt.id} is not a string: ${typeof response[prompt.id]}`);
+    if (typeof answer !== 'string') {
+      throw new Error(`Response for prompt ${prompt.id} is not a string: ${typeof answer}`);
     }
 
-    prompt.answer = (!!prompt.answer ? "|||" : "") + response[prompt.id] as string;
+    if (answer === 'q') return
 
-    if (prompt.recursive && response[prompt.id] !== "q") {
-      this.processPrompt(prompt)
-    }
+    prompt.answer = (!!prompt.answer ? "|||" : "") + answer as string;
+    if (prompt.recursive) await this.processPrompt(prompt)
   }
 
   protected getWorkflowName(): string {
