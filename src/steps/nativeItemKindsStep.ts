@@ -99,7 +99,7 @@ export default class NativeItemKindsStep extends BaseStep {
 
   private logger() {
     return {
-      nativeItemKindsAdded: () => console.log(`🚀 Updated NativeItemKinds with new kinds in file ${FilePaths.NativeItemKindsPath}`)
+      nativeItemKindsAdded: () => console.log(`${tab(2)}🚀 Updated NativeItemKinds with new kinds in file ${FilePaths.NativeItemKindsPath}`)
     }
   }
 }

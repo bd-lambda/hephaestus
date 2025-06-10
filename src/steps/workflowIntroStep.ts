@@ -1,6 +1,6 @@
 import { Prompt } from "./stepInterface";
 import fs from 'fs';
-import { addVariantToHaskellDataType, capitalize } from "../utils";
+import { addVariantToHaskellDataType, capitalize, tab } from "../utils";
 import { FilePaths } from "../constants";
 import BaseStep from "./baseStep";
 
@@ -40,8 +40,8 @@ export default class WorkflowIntroductionStep extends BaseStep {
 
   private logger() {
     return {
-      adapterFileCreated: () => console.log("🚀 Adpater instance file created at: ", FilePaths.VulcanAdapterInstance),
-      subsystemAdded: () => console.log(`🚀 Updated UnifiedQueueSubsystem with new subsystem: UnifiedQueue${this.workflowName()}Subsystem in file ${FilePaths.VulcanAdapterClass}`)
+      adapterFileCreated: () => console.log(tab(2), "🚀 Adpater instance file created at: ", FilePaths.VulcanAdapterInstance),
+      subsystemAdded: () => console.log(`${tab(2)}🚀 Updated UnifiedQueueSubsystem with new subsystem: UnifiedQueue${this.workflowName()}Subsystem in file ${FilePaths.VulcanAdapterClass}`)
     }
   }
 

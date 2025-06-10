@@ -2,7 +2,7 @@ export const FilePaths = {
   VulcanAdapterInstance: './src/Mercury/Risk/UnifiedQueue/Adapter/Instance/',
   VulcanAdapterClass: './src/Mercury/Risk/UnifiedQueue/Adapter/Class.hs',
   NativeItemKindsPath: './src/Model/UnifiedQueue/NativeItemKinds.hs',
-  ReasonKindsPath: './src/Model/UnifiedQueue/ReasonKinds.hs'
+  ReasonKindsPath: './src/Model/UnifiedQueue/ReasonKinds',
 }
 
 export const NativeItemKindsSuffix = 'ItemType';
@@ -12,3 +12,5 @@ export const NativeItemKindsTargetMarker = 'deriving stock';
 export const TabSize = 2;
 
 export const NativeItemKindJSONMarker = '(deriveJSONAndTypeScript mercuryDefaultOptions'
+
+export const ReasonKindTemplateFile = './src/templates/reasonKindsTemplate.bd';
