@@ -1,0 +1,26 @@
+{
+  "name": "create-vulcan-workflow",
+  "version": "1.0.0",
+  "description": "Quickly bootstraps a vulcan workflow by generating most of the boiler plate code",
+  "main": "/dist/index.js",
+  "module": "/dist/index.mjs",
+  "author": "bodunde",
+  "license": "MIT",
+  "scripts": {
+    "build": "tsup",
+    "watch": "tsup --watch",
+    "lint": "eslint . --ext .ts,.tsx",
+    "test": "jest"
+  },
+  "devDependencies": {
+    "@types/prompts": "^2.4.9",
+    "@typescript-eslint/eslint-plugin": "^8.34.0",
+    "@typescript-eslint/parser": "^8.34.0",
+    "eslint": "^9.28.0",
+    "tsup": "^8.5.0",
+    "typescript": "^5.8.3"
+  },
+  "dependencies": {
+    "prompts": "^2.4.2"
+  }
+}
