@@ -1,10 +1,10 @@
-import StepInterface, { Prompt } from "./stepInterface";
+import { Prompt } from "./stepInterface";
 import fs from 'fs';
 import { addStringArrayAfterString, capitalize, findIndexOfXAfterY, tab } from "../utils";
 import { FilePaths, NativeItemKindJSONMarker, NativeItemKindsSuffix, NativeItemKindsTargetMarker } from "../constants";
 import BaseStep from "./baseStep";
 
-export default class NativeItemKindsStep extends BaseStep implements StepInterface {
+export default class NativeItemKindsStep extends BaseStep {
   private updatedContent: string[] = [];
   private fileContent: string = ''
 
@@ -23,6 +23,7 @@ export default class NativeItemKindsStep extends BaseStep implements StepInterfa
     this.createNativeItemKinds()
     this.generateJSONAndTypescriptForNativeItemKinds();
     this.writeUpdatedContentToFile();
+    this.storeArtifacts();
     this.logger().nativeItemKindsAdded();
   }
 
@@ -86,6 +87,14 @@ export default class NativeItemKindsStep extends BaseStep implements StepInterfa
   private JSONAndTypescriptAlreadyGenerated(): boolean {
     const searchString = `''${this.getDataTypeName()}`;
     return this.fileContent.includes(searchString);
+  }
+
+  private storeArtifacts() {
+    this.artifacts.nativeItemKindDataTypeName = this.getDataTypeName();
+    this.artifacts.nativeItemKinds = this.promptOne.answer?.split("|||").map(kind => {
+      const [name, _] = kind.split(' - ').map(part => part.trim());
+      return capitalize(name || '')
+    })
   }
 
   private logger() {

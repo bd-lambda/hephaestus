@@ -1,10 +1,10 @@
-import StepInterface, { Prompt } from "./stepInterface";
+import { Prompt } from "./stepInterface";
 import fs from 'fs';
 import { addVariantToHaskellDataType, capitalize } from "../utils";
 import { FilePaths } from "../constants";
 import BaseStep from "./baseStep";
 
-export default class WorkflowIntroductionStep extends BaseStep implements StepInterface {
+export default class WorkflowIntroductionStep extends BaseStep {
   promptOne: Prompt = {
     id: 'workflow-name',
     message: "What is the name of your vulcan workflow?",

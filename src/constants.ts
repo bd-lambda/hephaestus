@@ -1,7 +1,8 @@
 export const FilePaths = {
   VulcanAdapterInstance: './src/Mercury/Risk/UnifiedQueue/Adapter/Instance/',
   VulcanAdapterClass: './src/Mercury/Risk/UnifiedQueue/Adapter/Class.hs',
-  NativeItemKindsPath: './src/Model/UnifiedQueue/NativeItemKinds.hs'
+  NativeItemKindsPath: './src/Model/UnifiedQueue/NativeItemKinds.hs',
+  ReasonKindsPath: './src/Model/UnifiedQueue/ReasonKinds.hs'
 }
 
 export const NativeItemKindsSuffix = 'ItemType';
