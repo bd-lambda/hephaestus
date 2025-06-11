@@ -1,7 +1,7 @@
-import StepInterface, { Artifacts, Prompt } from "./stepInterface";
+import StepInterface, { Artifacts, Prompt } from "../types";
 import prompts from 'prompts';
 
-export default class BaseStep implements StepInterface {
+export default abstract class BaseStep implements StepInterface {
   prompts: Prompt[] = [];
   artifacts: Artifacts = {};
 
@@ -14,6 +14,7 @@ export default class BaseStep implements StepInterface {
       await this.processPrompt(prompt);
       prompt.handler?.();
     }
+    this.storeArtifacts();
     return this.artifacts
   }
 
@@ -44,4 +45,8 @@ export default class BaseStep implements StepInterface {
   protected getWorkflowName(): string {
     return this.artifacts.workflowName || '';
   }
+
+  abstract storeArtifacts(): void;
+
+  abstract stepHandlers(): void;
 }

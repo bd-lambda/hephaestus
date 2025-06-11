@@ -1,6 +1,6 @@
-import { Prompt } from "./stepInterface";
+import { Prompt } from "../types";
 import fs from 'fs';
-import { addStringArrayAfterString, capitalize, convertPascalCaseToSnakeCase, findIndexOfXAfterY, runMigrationCommand, tab } from "../utils";
+import { addStringArrayAfterString, capitalize, convertPascalCaseToSnakeCase, findIndexOfXAfterY, migrationFileAlreadyCreated, runMigrationCommand, tab } from "../utils";
 import { FilePaths, NativeItemKindJSONMarker, NativeItemKindsAlterCommand, NativeItemKindsSuffix, NativeItemKindsTargetMarker } from "../constants";
 import BaseStep from "./baseStep";
 
@@ -18,16 +18,21 @@ export default class NativeItemKindsStep extends BaseStep {
 
   prompts = [this.promptOne];
 
-  private stepHandlers() {
+  stepHandlers() {
     this.loadFileContent()
     this.createNativeItemKinds()
     this.generateJSONAndTypescriptForNativeItemKinds();
     this.writeUpdatedContentToFile();
     this.createMigrationFile();
-    this.storeArtifacts();
     this.logger().nativeItemKindsAdded();
   }
 
+  storeArtifacts() {
+    this.artifacts.nativeItemKindDataTypeName = this.getDataTypeName();
+    this.artifacts.nativeItemKinds = this.nativeItemKinds()
+  }
+
+  // All the methods below are private and used internally within this step.
   private generateJSONAndTypescriptForNativeItemKinds() {
     if (this.JSONAndTypescriptAlreadyGenerated()) return;
 
@@ -99,30 +104,27 @@ export default class NativeItemKindsStep extends BaseStep {
     }) || []
   }
 
-  private storeArtifacts() {
-    this.artifacts.nativeItemKindDataTypeName = this.getDataTypeName();
-    this.artifacts.nativeItemKinds = this.nativeItemKinds()
+  private get migrationFileName() {
+    return `add_${convertPascalCaseToSnakeCase(this.getWorkflowName())}_native_item_kind`;
   }
 
   private createMigrationFile() {
-    if (this.migrationFileAlreadyCreated()) return;
-
-    const migrationName = `add_${convertPascalCaseToSnakeCase(this.getWorkflowName())}_native_item_kind`;
-    const {migrationSqlFilePath} = runMigrationCommand(migrationName)
+    if (this.isMigrationFileAlreadyCreated()) return;
+    const {migrationSqlFilePath} = runMigrationCommand(this.migrationFileName)
     const fileContentArray = this.nativeItemKinds().map(kind => this.createMigrationCommand(kind))
     if (!migrationSqlFilePath) {
-      throw new Error(`Migration SQL file path not found for migration: ${migrationName}`);
+      throw new Error(`Migration SQL file path not found for migration: ${this.migrationFileName}`);
     }
     fs.writeFileSync(migrationSqlFilePath, fileContentArray.join('\n'), 'utf-8');
   }
 
   private createMigrationCommand(nativeItemKind: string)  {
-    return NativeItemKindsAlterCommand.replace('{{workflow_name}}', this.getWorkflowName()).replace('{{native_item_kind}}', nativeItemKind);
+    return NativeItemKindsAlterCommand.replace('{{workflow_name}}', this.getWorkflowName())
+      .replace('{{native_item_kind}}', nativeItemKind);
   }
 
-  private migrationFileAlreadyCreated(): boolean {
-    const files = fs.readdirSync(FilePaths.MigrationFilesPath);
-    return files.some(f => f.startsWith(`add_${convertPascalCaseToSnakeCase(this.getWorkflowName())}_native_item_kind`));
+  private isMigrationFileAlreadyCreated(): boolean {
+    return migrationFileAlreadyCreated(this.migrationFileName)
   }
 
   private logger() {

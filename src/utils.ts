@@ -1,5 +1,6 @@
-import { TabSize } from "./constants";
+import { FilePaths, TabSize } from "./constants";
 import { execSync } from "child_process";
+import fs from "fs";
 import repl from "repl";
 
 export const capitalize = (str: string): string => {
@@ -91,6 +92,11 @@ export const runMigrationCommand = (migrationName: string): TMigrationResult => 
     throw error;
   }
 }
+
+export const migrationFileAlreadyCreated = (migrationName: string): boolean => {
+  const files = fs.readdirSync(FilePaths.MigrationFilesPath);
+  return files.some(f => f.startsWith(migrationName));
+} 
 
 export const runCli = () => {
   const r = repl.start({

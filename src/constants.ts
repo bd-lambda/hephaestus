@@ -17,3 +17,5 @@ export const NativeItemKindJSONMarker = '(deriveJSONAndTypeScript mercuryDefault
 export const ReasonKindTemplateFile = './src/templates/reasonKindsTemplate.bd';
 
 export const NativeItemKindsAlterCommand = `ALTER TYPE "unified_queue_item_kind" ADD VALUE 'UQ{{workflow_name}}{{native_item_kind}}';`
+
+export const ReasonKindAlterCommand = `ALTER TYPE "unified_queue_reason_kind" ADD VALUE 'UQ{{workflow_name}}{{reason_option}}{{reason_value}}';`

@@ -1,4 +1,4 @@
-import { Prompt } from "./stepInterface";
+import { Prompt } from "../types";
 import fs from 'fs';
 import { addVariantToHaskellDataType, capitalize, tab } from "../utils";
 import { FilePaths } from "../constants";
@@ -14,14 +14,19 @@ export default class WorkflowIntroductionStep extends BaseStep {
 
   prompts = [this.promptOne];
 
-  private stepHandlers() {
-    this.workflowNameRecieved()
+  stepHandlers() {
+    // this.workflowNameRecieved()
     this.registerUnifiedQueueSubsystem();
   }
 
+  storeArtifacts() {
+    this.artifacts.workflowName = this.workflowName();
+    this.artifacts.unifiedQueueSubsystemName = this.subsystemName();
+  }
+
+  // All the methods below are private and used internally within this step.
   private workflowNameRecieved() {
     this.createVulcanAdpaterInstanceFile()
-    this.artifacts['workflowName'] = this.workflowName();
     this.logger().adapterFileCreated()
   }
 
@@ -32,7 +37,6 @@ export default class WorkflowIntroductionStep extends BaseStep {
     if (!fileContent.includes(subsystemName)) {
       const updatedContent = addVariantToHaskellDataType(fileContent, 'UnifiedQueueSubsystem', subsystemName);
       fs.writeFileSync(FilePaths.VulcanAdapterClass, updatedContent);
-      this.artifacts['unifiedQueueSubsystemName'] = subsystemName;
     }
 
     this.logger().subsystemAdded()

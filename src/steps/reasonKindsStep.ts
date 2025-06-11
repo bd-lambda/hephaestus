@@ -1,10 +1,10 @@
-import { FilePaths } from "../constants";
+import { FilePaths, ReasonKindAlterCommand } from "../constants";
 import BaseStep from "./baseStep";
-import { Prompt } from "./stepInterface";
+import { Prompt } from "../types";
 import prompts from "prompts";
 import fs from 'fs';
 import reasonKindTemplateContent from "../templates/reasonKindsTemplate"
-import { tab } from "../utils";
+import { convertPascalCaseToSnakeCase, migrationFileAlreadyCreated, runMigrationCommand, tab } from "../utils";
 
 export default class ReasonKindsStep extends BaseStep {
   private fileContent: string[] = [];
@@ -21,16 +21,24 @@ export default class ReasonKindsStep extends BaseStep {
 
   prompts: Prompt[] = [this.promptOne];
 
-  private async stepHandlers() {
+  async stepHandlers() {
     if (this.reasonKindsAlreadyCreated()) return;
 
     this.parsePromptAnswers();
     await this.generateDataTypeForReasonOptions()
     this.generateFileContent();
     this.writeToFile()
+    this.createMigrationFile();
     this.logger().reasonKindCreated();
   }
 
+  storeArtifacts() {
+    this.artifacts.reasonKindsModuleName = this.getModuleName();
+    this.artifacts.reasonKindsData = this.reasonKindsData;
+    this.artifacts.reasonOptions = this.reasonOptions;
+  }
+
+  // All the methods below are private and used internally within this step.
   private parsePromptAnswers() {
     const response = this.promptOne.answer?.split("|||").map(item => item.trim().split(" "))
 
@@ -143,6 +151,40 @@ export default class ReasonKindsStep extends BaseStep {
   private reasonKindsAlreadyCreated(): boolean {
     const filePath = `${FilePaths.ReasonKindsPath}/${this.getModuleName()}.hs`;
     return fs.existsSync(filePath) && !!fs.readFileSync(filePath, 'utf-8').trim();
+  }
+
+  private get migrationFileName() {
+    return `add_${convertPascalCaseToSnakeCase(this.getWorkflowName())}_reason_kind`
+  }
+
+  private createMigrationFile() {
+    if (this.isMigrationFileAlreadyCreated()) return;
+    const { migrationSqlFilePath } = runMigrationCommand(this.migrationFileName);
+    const fileContentArray = this.constructMigrationFileContent();
+    if (!migrationSqlFilePath) {
+      throw new Error(`Migration SQL file path not found for migration: ${this.migrationFileName}`);
+    }
+    fs.writeFileSync(migrationSqlFilePath, fileContentArray.join('\n'), 'utf-8');
+  }
+
+  private constructMigrationFileContent(): string[] {
+    let fileContentArray: string[] = [];
+    this.reasonOptionsToBeDefined().forEach(reasonOption => {
+      this.reasonOptions[reasonOption].forEach(option => {
+        fileContentArray.push(this.createMigrationCommand(reasonOption, option.name));
+      }) 
+    })
+    return fileContentArray;
+  }
+
+  private isMigrationFileAlreadyCreated(): boolean {
+    return migrationFileAlreadyCreated(this.migrationFileName);
+  }
+
+  private createMigrationCommand(reasonOption: string, reasonValue: string): string {
+    return ReasonKindAlterCommand.replace('{{workflow_name}}', this.getWorkflowName())
+      .replace('{{reason_option}}', reasonOption)
+      .replace('{{reason_value}}', reasonValue);
   }
 
   private logger() {
