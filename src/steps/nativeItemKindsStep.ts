@@ -1,7 +1,7 @@
 import { Prompt } from "./stepInterface";
 import fs from 'fs';
-import { addStringArrayAfterString, capitalize, findIndexOfXAfterY, tab } from "../utils";
-import { FilePaths, NativeItemKindJSONMarker, NativeItemKindsSuffix, NativeItemKindsTargetMarker } from "../constants";
+import { addStringArrayAfterString, capitalize, convertPascalCaseToSnakeCase, findIndexOfXAfterY, runMigrationCommand, tab } from "../utils";
+import { FilePaths, NativeItemKindJSONMarker, NativeItemKindsAlterCommand, NativeItemKindsSuffix, NativeItemKindsTargetMarker } from "../constants";
 import BaseStep from "./baseStep";
 
 export default class NativeItemKindsStep extends BaseStep {
@@ -23,6 +23,7 @@ export default class NativeItemKindsStep extends BaseStep {
     this.createNativeItemKinds()
     this.generateJSONAndTypescriptForNativeItemKinds();
     this.writeUpdatedContentToFile();
+    this.createMigrationFile();
     this.storeArtifacts();
     this.logger().nativeItemKindsAdded();
   }
@@ -36,6 +37,8 @@ export default class NativeItemKindsStep extends BaseStep {
   }
 
   private writeUpdatedContentToFile() {
+    const updatedFileContent = this.updatedContent.join('\n');
+    if (updatedFileContent === this.fileContent) return; 
     fs.writeFileSync(FilePaths.NativeItemKindsPath, this.updatedContent.join('\n'));
   }
 
@@ -89,12 +92,37 @@ export default class NativeItemKindsStep extends BaseStep {
     return this.fileContent.includes(searchString);
   }
 
-  private storeArtifacts() {
-    this.artifacts.nativeItemKindDataTypeName = this.getDataTypeName();
-    this.artifacts.nativeItemKinds = this.promptOne.answer?.split("|||").map(kind => {
+  private nativeItemKinds() {
+    return this.promptOne.answer?.split("|||").map(kind => {
       const [name, _] = kind.split(' - ').map(part => part.trim());
       return capitalize(name || '')
-    })
+    }) || []
+  }
+
+  private storeArtifacts() {
+    this.artifacts.nativeItemKindDataTypeName = this.getDataTypeName();
+    this.artifacts.nativeItemKinds = this.nativeItemKinds()
+  }
+
+  private createMigrationFile() {
+    if (this.migrationFileAlreadyCreated()) return;
+
+    const migrationName = `add_${convertPascalCaseToSnakeCase(this.getWorkflowName())}_native_item_kind`;
+    const {migrationSqlFilePath} = runMigrationCommand(migrationName)
+    const fileContentArray = this.nativeItemKinds().map(kind => this.createMigrationCommand(kind))
+    if (!migrationSqlFilePath) {
+      throw new Error(`Migration SQL file path not found for migration: ${migrationName}`);
+    }
+    fs.writeFileSync(migrationSqlFilePath, fileContentArray.join('\n'), 'utf-8');
+  }
+
+  private createMigrationCommand(nativeItemKind: string)  {
+    return NativeItemKindsAlterCommand.replace('{{workflow_name}}', this.getWorkflowName()).replace('{{native_item_kind}}', nativeItemKind);
+  }
+
+  private migrationFileAlreadyCreated(): boolean {
+    const files = fs.readdirSync(FilePaths.MigrationFilesPath);
+    return files.some(f => f.startsWith(`add_${convertPascalCaseToSnakeCase(this.getWorkflowName())}_native_item_kind`));
   }
 
   private logger() {

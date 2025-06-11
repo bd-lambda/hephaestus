@@ -47,9 +47,12 @@ export default class ReasonKindsStep extends BaseStep {
     }, {} as Record<string, string>);
   }
 
+  private reasonOptionsToBeDefined() {
+    return Object.values(this.reasonKindsData).filter(Boolean);
+  }
+
   private async generateDataTypeForReasonOptions() {
-    const reasonOptionsToBeDefined = Object.values(this.reasonKindsData).filter(Boolean);
-    for (const reasonOption of reasonOptionsToBeDefined) {
+    for (const reasonOption of this.reasonOptionsToBeDefined()) {
       await this.promptUserForReasonOptionsAndSaveResults(reasonOption)
     }
   }
@@ -129,7 +132,7 @@ export default class ReasonKindsStep extends BaseStep {
   private addTypescriptGenerationLine(): string[] {
     const generationString: string[] = [
       `''${this.getModuleName()}`,
-      ...Object.entries(this.reasonOptions).flatMap(([_, opts]) => opts.map(o => o.name))
+      ...this.reasonOptionsToBeDefined().map(option => `''${option}`),
     ]
 
     return [
