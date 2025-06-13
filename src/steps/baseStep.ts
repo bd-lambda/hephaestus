@@ -12,7 +12,7 @@ export default abstract class BaseStep implements StepInterface {
   async execute() {
     for (const prompt of this.prompts) {
       await this.processPrompt(prompt);
-      prompt.handler?.();
+      await prompt.handler?.();
     }
     this.storeArtifacts();
     return this.artifacts
@@ -23,17 +23,15 @@ export default abstract class BaseStep implements StepInterface {
       type: prompt.type,
       name: prompt.id,
       message: prompt.message,
+      initial: prompt.initial,
+      choices: prompt.choices,
     })
-    const answer = response[prompt.id].trim();
+    const answer = response[prompt.id]?.trim();
 
     if (answer === ':exit') return
     
     if (prompt.required && answer === undefined) {
       throw new Error(`No response provided for prompt: ${prompt.id}`);
-    }
-
-    if (typeof answer !== 'string') {
-      throw new Error(`Response for prompt ${prompt.id} is not a string: ${typeof answer}`);
     }
 
     if (answer === 'q') return
@@ -42,8 +40,12 @@ export default abstract class BaseStep implements StepInterface {
     if (prompt.recursive) await this.processPrompt(prompt)
   }
 
-  protected getWorkflowName(): string {
+  protected get workflowName(): string {
     return this.artifacts.workflowName || '';
+  }
+
+  protected get readableWorkflowName(): string {
+    return this.workflowName.replace(/([a-z])([A-Z])/g, '$1 $2');
   }
 
   abstract storeArtifacts(): void;

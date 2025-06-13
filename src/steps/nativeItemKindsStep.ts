@@ -1,6 +1,6 @@
 import { Prompt } from "../types";
 import fs from 'fs';
-import { addStringArrayAfterString, capitalize, convertPascalCaseToSnakeCase, findIndexOfXAfterY, migrationFileAlreadyCreated, runMigrationCommand, tab } from "../utils";
+import { addStringArrayAfterString, capitalize, constructSumType, convertPascalCaseToSnakeCase, findIndexOfXAfterY, migrationFileAlreadyCreated, runMigrationCommand, tab } from "../utils";
 import { FilePaths, NativeItemKindJSONMarker, NativeItemKindsAlterCommand, NativeItemKindsSuffix, NativeItemKindsTargetMarker } from "../constants";
 import BaseStep from "./baseStep";
 
@@ -12,13 +12,13 @@ export default class NativeItemKindsStep extends BaseStep {
     id: 'native-item-kinds',
     message: "Native item kinds for your vulcan workflow? (format: name - description. enter 'q' to finish)",
     type: "text",
-    handler: () => this.stepHandlers(),
+    handler: async () => await this.stepHandlers(),
     recursive: true
   };
 
   prompts = [this.promptOne];
 
-  stepHandlers() {
+  async stepHandlers() {
     this.loadFileContent()
     this.createNativeItemKinds()
     this.generateJSONAndTypescriptForNativeItemKinds();
@@ -28,7 +28,7 @@ export default class NativeItemKindsStep extends BaseStep {
   }
 
   storeArtifacts() {
-    this.artifacts.nativeItemKindDataTypeName = this.getDataTypeName();
+    this.artifacts.nativeItemKindDataTypeName = this.dataTypeName;
     this.artifacts.nativeItemKinds = this.nativeItemKinds()
   }
 
@@ -38,7 +38,7 @@ export default class NativeItemKindsStep extends BaseStep {
 
     const targetIndex = findIndexOfXAfterY(this.updatedContent, "]", NativeItemKindJSONMarker)
     if (targetIndex === -1) throw new Error(`Target marker "${NativeItemKindJSONMarker}" not found in file.`);
-    this.updatedContent.splice(targetIndex, 0, `${tab(1)}, ''${this.getDataTypeName()}`);
+    this.updatedContent.splice(targetIndex, 0, `${tab(1)}, ''${this.dataTypeName}`);
   }
 
   private writeUpdatedContentToFile() {
@@ -60,30 +60,26 @@ export default class NativeItemKindsStep extends BaseStep {
     this.updatedContent = addStringArrayAfterString(this.fileContent, NativeItemKindsTargetMarker, nativeItemKindsString)
   }
 
-  private getDataTypeName(): string {
-    return this.getWorkflowName() + NativeItemKindsSuffix;
+  private get dataTypeName(): string {
+    return this.workflowName + NativeItemKindsSuffix;
   }
 
   private constructNativeItemKindsString(nativeItemKindsData: string[]): string[] {
-    const stringArray = [`\ndata ${this.getDataTypeName()}`];
-    let counter = 0;
-    
-    for (const kind of nativeItemKindsData) {
-      const [name, description] = kind.split(' - ').map(part => capitalize(part.trim()));
-      if (!name || !description) {
-        throw new Error(`Invalid format for native item kind: "${kind}". Expected format: "name - description".`);
-      }
-      stringArray.push(`${tab(1)}${counter === 0 ? '=' : '|'} -- | ${description}`);
-      stringArray.push(`${tab(2)}${name}`);
-      stringArray.push(`${tab(1)}deriving stock (Show, Eq, Ord)`)
-      counter++;
-    }
-    
-    return stringArray;
+    return constructSumType({
+      name: this.dataTypeName,
+      deriving: ['Show', 'Eq', 'Ord'],
+      fields: nativeItemKindsData.map(kind => {
+        const [name, description] = kind.split(' - ').map(part => capitalize(part.trim()));
+        if (!name || !description) {
+          throw new Error(`Invalid format for native item kind: "${kind}". Expected format: "name - description".`);
+        }
+        return {name, description}
+      })
+    }).split('\n')
   }
 
   private nativeItemKindAlreadyCreated(): boolean {
-    const searchString = `data ${this.getDataTypeName()}`;
+    const searchString = `data ${this.dataTypeName}`;
     return this.fileContent.includes(searchString);
   }
 
@@ -93,7 +89,7 @@ export default class NativeItemKindsStep extends BaseStep {
   }
 
   private JSONAndTypescriptAlreadyGenerated(): boolean {
-    const searchString = `''${this.getDataTypeName()}`;
+    const searchString = `''${this.dataTypeName}`;
     return this.fileContent.includes(searchString);
   }
 
@@ -105,7 +101,7 @@ export default class NativeItemKindsStep extends BaseStep {
   }
 
   private get migrationFileName() {
-    return `add_${convertPascalCaseToSnakeCase(this.getWorkflowName())}_native_item_kind`;
+    return `add_${convertPascalCaseToSnakeCase(this.workflowName)}_native_item_kind`;
   }
 
   private createMigrationFile() {
@@ -119,8 +115,8 @@ export default class NativeItemKindsStep extends BaseStep {
   }
 
   private createMigrationCommand(nativeItemKind: string)  {
-    return NativeItemKindsAlterCommand.replace('{{workflow_name}}', this.getWorkflowName())
-      .replace('{{native_item_kind}}', nativeItemKind);
+    return NativeItemKindsAlterCommand.replaceAll('{{workflow_name}}', this.workflowName)
+      .replaceAll('{{native_item_kind}}', nativeItemKind);
   }
 
   private isMigrationFileAlreadyCreated(): boolean {

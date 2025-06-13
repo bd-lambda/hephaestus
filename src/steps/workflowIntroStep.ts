@@ -9,18 +9,18 @@ export default class WorkflowIntroductionStep extends BaseStep {
     id: 'workflow-name',
     message: "What is the name of your vulcan workflow?",
     type: "text",
-    handler: () => this.stepHandlers()
+    handler: async () => await this.stepHandlers()
   }
 
   prompts = [this.promptOne];
 
-  stepHandlers() {
+  async stepHandlers() {
     // this.workflowNameRecieved()
     this.registerUnifiedQueueSubsystem();
   }
 
   storeArtifacts() {
-    this.artifacts.workflowName = this.workflowName();
+    this.artifacts.workflowName = this.getWorkflowName();
     this.artifacts.unifiedQueueSubsystemName = this.subsystemName();
   }
 
@@ -45,15 +45,15 @@ export default class WorkflowIntroductionStep extends BaseStep {
   private logger() {
     return {
       adapterFileCreated: () => console.log(tab(2), "🚀 Adpater instance file created at: ", FilePaths.VulcanAdapterInstance),
-      subsystemAdded: () => console.log(`${tab(2)}🚀 Updated UnifiedQueueSubsystem with new subsystem: UnifiedQueue${this.workflowName()}Subsystem in file ${FilePaths.VulcanAdapterClass}`)
+      subsystemAdded: () => console.log(`${tab(2)}🚀 Updated UnifiedQueueSubsystem with new subsystem: UnifiedQueue${this.getWorkflowName()}Subsystem in file ${FilePaths.VulcanAdapterClass}`)
     }
   }
 
   private subsystemName() {
-    return `UnifiedQueue${this.workflowName()}Subsystem`;
+    return `UnifiedQueue${this.getWorkflowName()}Subsystem`;
   }
 
-  private workflowName () {
+  private getWorkflowName () {
     if (!this.promptOne.answer) {
       throw new Error("Workflow name has not been set.");
     }
@@ -65,6 +65,6 @@ export default class WorkflowIntroductionStep extends BaseStep {
   }
 
   private vulcanInstanceFilePath() {
-    return `${FilePaths.VulcanAdapterInstance}${this.workflowName()}.hs`
+    return `${FilePaths.VulcanAdapterInstance}${this.getWorkflowName()}.hs`
   }
 }
