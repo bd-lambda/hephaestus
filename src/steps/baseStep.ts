@@ -1,8 +1,7 @@
-import StepInterface, { Artifacts, Prompt } from "../types";
-import prompts from 'prompts';
+import StepInterface, { Artifacts, Prompt, TPromptIndex } from "../types";
+import prompts, { PromptObject } from 'prompts';
 
 export default abstract class BaseStep implements StepInterface {
-  prompts: Prompt[] = [];
   artifacts: Artifacts = {};
 
   constructor(artifacts?: Artifacts) {
@@ -10,34 +9,52 @@ export default abstract class BaseStep implements StepInterface {
   }
 
   async execute() {
-    for (const prompt of this.prompts) {
-      await this.processPrompt(prompt);
-      await prompt.handler?.();
-    }
+    await this.processPrompt(this.promptOne);
+    await this.promptOne.handler?.();
     this.storeArtifacts();
     return this.artifacts
   }
 
-  async processPrompt(prompt: Prompt) {
-    const response = await prompts({
-      type: prompt.type,
-      name: prompt.id,
-      message: prompt.message,
-      initial: prompt.initial,
-      choices: prompt.choices,
+  private parsePrompt(prompt: TPromptIndex): PromptObject | PromptObject[] {
+    const allPrompts = prompt.prompts;
+    const toPromptObject = (p: Prompt): PromptObject => ({
+      type: p.type,
+      name: p.id,
+      message: p.message,
+      initial: p.initial,
+      choices: p.choices,
+      active: p.active,
+      inactive: p.inactive,
+      validate: p.validate
     })
-    const answer = response[prompt.id]?.trim();
-
-    if (answer === ':exit') return
     
-    if (prompt.required && answer === undefined) {
-      throw new Error(`No response provided for prompt: ${prompt.id}`);
+    return Array.isArray(allPrompts) ? allPrompts.map(toPromptObject) : toPromptObject(allPrompts);
+  }
+
+  async processPrompt(prompt: TPromptIndex, firstAttempt=true) {
+    const parsedPrompts = this.parsePrompt(prompt);
+    const isList = Array.isArray(parsedPrompts);
+
+    if (!firstAttempt && prompt.recursive) {
+      if (isList) { 
+        parsedPrompts[0].message = parsedPrompts[0].message + " - press 'q' to finish";
+      } else {
+        parsedPrompts.message = parsedPrompts.message + " - press 'q' to finish";
+      }
     }
 
-    if (answer === 'q') return
+    const response = await prompts(parsedPrompts) 
+    
+    if (Object.values(response).some(value => value === 'q')) return
 
-    prompt.answer = (!!prompt.answer ? "|||" : "") + answer as string;
-    if (prompt.recursive) await this.processPrompt(prompt)
+    if (prompt.recursive === true) {
+      prompt.answer = (prompt.answer || []) as Array<Record<string, string>>;
+      prompt.answer.push(response);
+    } else {
+      prompt.answer = response as Record<string, string>;
+    }
+
+    if (prompt.recursive) await this.processPrompt(prompt, false)
   }
 
   protected get workflowName(): string {
@@ -51,4 +68,6 @@ export default abstract class BaseStep implements StepInterface {
   abstract storeArtifacts(): void;
 
   abstract stepHandlers(): void;
+
+  abstract promptOne: TPromptIndex;
 }

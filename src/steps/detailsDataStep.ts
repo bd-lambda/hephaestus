@@ -1,39 +1,44 @@
-import { Prompt } from "../types";
+import { Prompt, TPromptIndex } from "../types";
 import prompts from "prompts";
 import fs from 'fs';
 import BaseStep from "./baseStep";
-import { derivingStockMarker, FilePaths, TSLineMarker } from "../constants";
+import { derivingStockMarker, DetailsDataDefinitionMarker, FilePaths, TSLineMarker } from "../constants";
 import { addImport, constructRecordType, findIndexOfXAfterY, lastIndexOf, tab } from "../utils";
 
 export default class DetailsDataStep extends BaseStep {
   fileContent: string = ''
   fileContentArr: string[] = [];
   detailsDataField: Array<{ name: string, type: string, description: string, importPath?: string }> = [];
-  promptOne: Prompt = {
-    id: 'details-data',
-    message: "Do you want to add details data to your workflow? (yes/no)",
-    type: "select",
-    initial: 1,
-    choices: [
-      { title: "No", value: 'n' },
-      { title: "Yes", value: 'y' },
-    ],
+  promptOne: TPromptIndex = {
+    prompts: {
+      id: 'details-data',
+      message: "Do you want to add details data to your workflow? (yes/no)",
+      type: "select",
+      initial: 1,
+      choices: [
+        { title: "No", value: 'n' },
+        { title: "Yes", value: 'y' },
+      ],
+    },
+    recursive: false,
     handler: async () => await this.stepHandlers()
   }
 
-  prompts: Prompt[] = [this.promptOne];
-
   storeArtifacts(): void {}
 
-  async stepHandlers() {
-    if (this.promptOne.answer === 'n') return this.logger().skipDetailsDataCreation();
+  private get promptAnswer(): string | undefined {
+    if (this.promptOne.recursive === false) return this.promptOne.answer?.['details-data'].trim();
+  }
 
-    this.createDetailsDataModule();
+  async stepHandlers() {
+    if (this.promptAnswer === 'n') return this.logger().skipDetailsDataCreation();
+
+    await this.createDetailsDataModule();
     this.logger().detailsDataModuleCreated();
   }
   
-  private createDetailsDataModule() {
-    this.promptUsersForDetailsDataAndType();
+  private async createDetailsDataModule() {
+    await this.promptUsersForDetailsDataAndType();
     this.loadFileContent();
     this.exportDetailsDataModule();
     this.addModuleToDetailsDataDefinition()
@@ -54,11 +59,11 @@ export default class DetailsDataStep extends BaseStep {
       throw new Error(`Could not correct parse file: ${FilePaths.DetailsDataPath}`);
     }
 
-    this.fileContentArr.splice(targetIndex, 0, `${tab(2) + this.dataTypeName},`);
+    this.fileContentArr.splice(targetIndex, 0, `${tab(2) + this.dataTypeName} (..),`);
   }
 
   private addModuleToDetailsDataDefinition() {
-    const targetIndex = findIndexOfXAfterY(this.fileContentArr, 'data UnifiedQueueItemDetailsData', derivingStockMarker);
+    const targetIndex = findIndexOfXAfterY(this.fileContentArr, derivingStockMarker, DetailsDataDefinitionMarker);
     if (targetIndex === -1) {
       throw new Error(`Could not find target marker "${derivingStockMarker}" in file: ${FilePaths.DetailsDataPath}`);
     }
@@ -69,7 +74,7 @@ export default class DetailsDataStep extends BaseStep {
   private addDetailsModuleDataType() {
     let targetIndex = findIndexOfXAfterY(this.fileContentArr, TSLineMarker, derivingStockMarker);
     targetIndex = targetIndex === -1 ? this.fileContentArr.length : targetIndex;
-    this.fileContentArr.splice(targetIndex, 0, ...this.generateDetailsDataModule())
+    this.fileContentArr.splice(targetIndex, 0, this.generateDetailsDataModule())
   }
 
   private addGenerateTsLine() {
@@ -109,12 +114,12 @@ export default class DetailsDataStep extends BaseStep {
         message: `Please provide the import path for the data type (i.e for OrganizationID it would be "PersistentModels.Organization"), leave blank if not applicable.`,
       },
       {
-        type: 'list',
+        type: 'select',
         name: 'add-another',
         message: 'Do you want to add another field to the details data?',
         choices: [
+          { title: 'No', value: 'n' },
           { title: 'Yes', value: 'y' },
-          { title: 'No', value: 'n' }
         ],
         initial: 1,
       }

@@ -1,0 +1,201 @@
+import { FilePaths, ItemDispositionMarker } from "../constants";
+import { dispositionAdapter, matchFunction } from "../templates/utilsTemplate";
+import { TPromptIndex } from "../types";
+import { addNullaryTypeToSumType, fetchRiskWorkflow, fetchSlackChannels, findIndexOfXAfterY, tab } from "../utils";
+import BaseStep from "./baseStep";
+import fs from 'fs';
+import workflowInstanceTemplate from '../templates/workflowInstanceTemplate';
+import prompts from "prompts";
+
+export default class WorkflowInstantiationStep extends BaseStep {
+  workflowKindFileContent: string = '';
+  updatedWFKFileContent: string = '';
+  outcomes: Array<{ outcome: string, description: string, isPending: boolean, reactionable: boolean }> = [];
+
+
+  promptOne: TPromptIndex = {
+    prompts: [
+      {
+        id: 'permission-kind',
+        message: 'select a permission kind for this workflow',
+        type: 'select',
+        choices: fetchRiskWorkflow().map(w => ({title: w, value: w})),
+        initial: 0,
+      },
+      {
+        id: 'slack-channel',
+        message: 'select a slack channel for this workflow (used for notifications)',
+        type: 'select',
+        choices: fetchSlackChannels().map(channel => ({title: channel, value: channel})),
+        initial: 0,
+      }
+    ],
+    recursive: false,
+    handler: async () => await this.stepHandlers()
+  }
+  
+  storeArtifacts() {}
+
+  async stepHandlers() {
+    await this.registerWorkflowKind()
+    await this.registerPermissions()
+    await this.registerSlackChannel();
+    await this.updateWorkflowKindFile();
+
+    await this.updateUtilsFile();
+
+    await this.createOutcomesIfNecessary();
+    await this.updateOutcomeActionHelpersFile();
+    await this.createWorkflowInstanceFile();
+  }
+
+  private async registerWorkflowKind() {
+    this.workflowKindFileContent = fs.readFileSync(FilePaths.UQWorkflowKindPath, 'utf-8');
+    this.updatedWFKFileContent = addNullaryTypeToSumType(this.workflowKindFileContent.split('\n'), 'UnifiedQueueWorkflowKind', this.workflowKind).join('\n');
+  }
+
+  private async registerPermissions() {
+    const content = this.updatedWFKFileContent.split('\n');
+    const targetIndex = findIndexOfXAfterY(content, '\n', 'permissionForWorkflowKind =')
+    if (targetIndex === -1) throw new Error(`Could not find the target index for permissionForWorkflowKind in ${FilePaths.UQWorkflowKindPath}`);
+    content.splice(targetIndex, 0, `${tab(1)}${this.workflowKind}->\n${tab(2)+this.permissionKind}`);
+    this.updatedWFKFileContent = content.join('\n');
+  } 
+
+  private registerSlackChannel() {
+    const content = this.updatedWFKFileContent.split('\n');
+    const targetIndex = findIndexOfXAfterY(content, '\n', 'alertChannelForWorkflowKind =')
+    if (targetIndex === -1) throw new Error(`Could not find the target index for alertChannelForWorkflowKind in ${FilePaths.UQWorkflowKindPath}`);
+    content.splice(targetIndex, 0, `${tab(1)}${this.workflowKind}->\n${tab(2)}"${this.slackName}"`);
+    this.updatedWFKFileContent = content.join('\n');
+  }
+
+  private async updateWorkflowKindFile() {
+    if (this.workflowKindFileContent === this.updatedWFKFileContent) return;
+    fs.writeFileSync(FilePaths.UQWorkflowKindPath, this.updatedWFKFileContent, 'utf-8');
+  }
+
+  private async updateUtilsFile() {
+    const fileContent = fs.readFileSync(FilePaths.UQUtilsFile, 'utf-8').split('\n');
+    const targetIndex = findIndexOfXAfterY(fileContent, 'where', ItemDispositionMarker);
+    if (targetIndex === -1) throw new Error(`Could not find the target index for ${ItemDispositionMarker} in ${FilePaths.UQUtilsFile}`);
+
+    fileContent.splice(targetIndex, 0, `${tab(1)}${dispositionAdapter.replaceAll('{{workflow_name}}', this.workflowName)}`);
+    const matchFunctionText = matchFunction.replaceAll('{{workflow_name}}', this.workflowName)
+    const targetIndex2 = findIndexOfXAfterY(fileContent, '_ -> Nothing', 'where');
+    if (targetIndex2 === -1) throw new Error(`Could not find the target index for '_ -> Nothing' in ${FilePaths.UQUtilsFile}`);
+
+    fileContent.splice(targetIndex2 + 1, 0, `\n${matchFunctionText}`);
+    fs.writeFileSync(FilePaths.UQUtilsFile, fileContent.join('\n'), 'utf-8');
+  }
+
+  private async createOutcomesIfNecessary() {
+    await this.runPromptForOutcomes()
+    let outcomesFileContent = fs.readFileSync(FilePaths.UQOutcomeKindPath, 'utf-8').split('\n');
+
+    this.outcomes.forEach(outcome => {
+      outcomesFileContent = addNullaryTypeToSumType(outcomesFileContent, 'UnifiedQueueOutcomeKind', outcome.outcome, outcome.description);
+      
+      const targetIndex = findIndexOfXAfterY(outcomesFileContent, '\n', 'isPendingOutcome = ');
+      if (targetIndex === -1) throw new Error(`Could not find the target index for isPendingOutcome in ${FilePaths.UQOutcomeKindPath}`);
+      outcomesFileContent.splice(targetIndex, 0, `${tab(1)}${outcome.outcome} -> ${outcome.isPending ? 'True' : 'False'}`);
+
+      const targetIndex2 = findIndexOfXAfterY(outcomesFileContent, '\n', 'outcomeCanBeReActioned =');
+      if (targetIndex2 === -1) throw new Error(`Could not find the target index for outcomeCanBeReActioned in ${FilePaths.UQOutcomeKindPath}`);
+      outcomesFileContent.splice(targetIndex2, 0, `${tab(1)}${outcome.outcome} -> ${outcome.reactionable ? 'True' : 'False'}`);
+    })
+
+    fs.writeFileSync(FilePaths.UQOutcomeKindPath, outcomesFileContent.join('\n'), 'utf-8');
+  }
+
+  private async updateOutcomeActionHelpersFile() {
+    if (this.outcomes.length === 0) return;
+    let fileContent = fs.readFileSync(FilePaths.OutcomeActionHelpersPath, 'utf-8').split('\n');
+
+    this.outcomes.forEach(outcome => {
+      const targetIndex = findIndexOfXAfterY(fileContent, '\n', 'unifiedQueueOutcomeToRiskAlertDecision = ');
+      if (targetIndex === -1) throw new Error(`Could not find the target index for unifiedQueueOutcomeToRiskAlertDecision in ${FilePaths.OutcomeActionHelpersPath}`);
+      fileContent.splice(targetIndex, 0, `${tab(1)}${outcome.outcome} -> RaaOther`);
+    })
+
+    fs.writeFileSync(FilePaths.OutcomeActionHelpersPath, fileContent.join('\n'), 'utf-8');
+  }
+
+  private async createWorkflowInstanceFile() {
+    const filePath = `${FilePaths.VulcanAdapterInstance}${this.workflowName}.hs`;
+    if (fs.existsSync(filePath)) return;
+    const fileContent = workflowInstanceTemplate.replaceAll('{{workflow_name}}', this.workflowName)
+    fs.writeFileSync(filePath, fileContent, 'utf-8');
+  }
+
+  private async runPromptForOutcomes() {
+    const response = await prompts([
+      {
+        type: 'text',
+        name: 'outcome',
+        message: `Please provide the outcome for the workflow "${this.workflowName}" (or press enter to skip):`,
+      },
+      {
+        type: prev => !prev?.trim() ? null : 'text',
+        name: 'outcome-description',
+        message: 'Enter a description for the outcome (used for haddock comments):',
+        validate: v => v.trim() ? true : 'Description cannot be empty.',
+      },
+      {
+        type: prev => !prev?.trim() ? null : 'select',
+        name: 'is-pending',
+        message: 'Does this outcome represent a pending state?',
+        choices: [
+          { title: 'Yes', value: true },
+          { title: 'No', value: false }
+        ],
+        initial: 1,
+      },
+      {
+        type: prev => !prev?.trim() ? null : 'select',
+        name: 'can-be-reactioned',
+        message: 'Can this outcome be re-actioned?',
+        choices: [
+          { title: 'Yes', value: true },
+          { title: 'No', value: false }
+        ],
+        initial: 1,
+      },
+      {
+        type: prev => !prev?.trim() ? null : 'select',
+        name: 'add-another',
+        message: 'Do you want to add another outcome?',
+        choices: [
+          { title: 'Yes', value: true },
+          { title: 'No', value: false }
+        ],
+        initial: 1,
+      }
+    ])
+
+    if (!response.outcome?.trim()) return;
+    
+    this.outcomes.push({
+      outcome: response.outcome.trim(),
+      description: response['outcome-description']?.trim() || '',
+      isPending: response['is-pending'] || false,
+      reactionable: response['can-be-reactioned'] || false
+    });
+
+    if (response['add-another'] === true) await this.runPromptForOutcomes();
+  }
+
+  private get workflowKind(): string {
+    return `${this.workflowName}Workflow`
+  }
+
+  private get permissionKind(): string {
+    if (this.promptOne.recursive === false) return this.promptOne.answer?.['permission-kind']?.trim() || '';
+    return ''
+  }
+
+  private get slackName(): string {
+    if (this.promptOne.recursive === false) return this.promptOne.answer?.['slack-channel']?.trim() || '';
+    return '';
+  }
+}

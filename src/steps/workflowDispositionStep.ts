@@ -1,6 +1,6 @@
 import { derivingStockMarker, FilePaths, ModulePaths } from "../constants";
-import { Prompt } from "../types";
-import { constructRecordType, convertPascalCaseToSnakeCase, findIndexOfXAfterY, lowerFirstLetter, migrationFileAlreadyCreated, pascalCaseToReadable, runMigrationCommand, tab, trimStringArr } from "../utils";
+import { TPromptIndex } from "../types";
+import { addImport, addNullaryTypeToSumType, constructRecordType, convertPascalCaseToSnakeCase, findIndexOfXAfterY, lowerFirstLetter, migrationFileAlreadyCreated, pascalCaseToReadable, runMigrationCommand, tab, trimStringArr } from "../utils";
 import BaseStep from "./baseStep";
 import fs from 'fs';
 import workflowDispositionTemplate from '../templates/dispositionTemplate'
@@ -8,34 +8,40 @@ import workflowDispositionVersionTemplate from '../templates/dispositionVersionT
 
 export default class WorkflowDispositionStep extends BaseStep {
   dispositionDataFileContent: string = '';
-  promptOne: Prompt = {
-    id: 'workflow-disposition',
-    message: "Would you like to create the disposition data for your vulcan workflow? (yes/no)",
-    type: "select",
-    initial: 1,
-    choices: [
-      { title: "No", value: 'n' },
-      { title: "Yes", value: 'y' },
-    ],
+  promptOne: TPromptIndex = {
+    prompts: {
+      id: 'workflow-disposition',
+      message: "Would you like to create the disposition data for your vulcan workflow? (yes/no)",
+      type: "select",
+      initial: 1,
+      choices: [
+        { title: "No", value: 'n' },
+        { title: "Yes", value: 'y' },
+      ],
+    },
+    recursive: false,
     handler: async () => await this.stepHandlers()
   }
 
-  prompts: Prompt[] = [this.promptOne];
-
   async stepHandlers() {
-    if (this.promptOne.answer === 'n') return this.logger().skipDispositionCreation();
+    if (this.promptAnswer === 'n') return this.logger().skipDispositionCreation();
 
     this.registerWorkflowDisposition();
     this.createWorkflowDispositionModule();
     this.exportWorkflowDispositionModule();
     this.createDispositionVersionModule();
     this.createMigrationFile();
+    this.updateUQDispositionVersionFile();
     this.logger().dispositionDataRegistered();
   }
 
   storeArtifacts(): void {}
 
   // All the methods below are private and used internally within this step.
+  private get promptAnswer(): string | undefined {
+    return this.promptOne.recursive === false ? this.promptOne.answer?.['workflow-disposition'].trim() : undefined;
+  }
+
   private registerWorkflowDisposition() {
     this.dispositionDataFileContent = fs.readFileSync(FilePaths.DispositionDataPath, 'utf-8');
     if (this.dispositionDataFileContent.includes(this.dispositionDataTypeAndValue)) return
@@ -56,7 +62,7 @@ export default class WorkflowDispositionStep extends BaseStep {
 
     const fileContent = workflowDispositionTemplate
       .replaceAll('{{workflow_name}}', this.workflowName)
-      .replaceAll('{{readble_workflow_name}}', this.readableWorkflowName)
+      .replaceAll('{{readable_workflow_name}}', this.readableWorkflowName)
       .replaceAll('{{disposition_goes_here}}', this.defineDispositionV1DataType())
 
     fs.writeFileSync(fileName, fileContent, 'utf-8');
@@ -118,6 +124,22 @@ export default class WorkflowDispositionStep extends BaseStep {
     }
 
     fs.writeFileSync(migrationSqlFilePath, migrationCommand, 'utf-8');
+  }
+
+  private updateUQDispositionVersionFile() {
+    const uqName = `UnifiedQueue${this.workflowName}Version ${this.workflowName}Version`
+    const fileContent = fs.readFileSync(FilePaths.UQDispositionVersionPath, 'utf-8').split('\n');
+    let updatedFileContent = addImport(
+      fileContent, 
+      ModulePaths.DispositionVersion + '.' + this.workflowName + 'DispositionVersion' + `(${this.workflowName}Version)`
+    );
+    updatedFileContent = addNullaryTypeToSumType(
+      fileContent, 
+      'UnifiedQueueDispositionVersion', 
+      uqName,
+      `Represents the different disposition versions for all ${this.readableWorkflowName} workflows.`
+    )
+    fs.writeFileSync(FilePaths.UQDispositionVersionPath, updatedFileContent.join('\n'), 'utf-8');
   }
 
   private logger() {

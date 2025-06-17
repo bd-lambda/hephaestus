@@ -1,25 +1,25 @@
 import { FilePaths, ModulePaths, ReasonKindAlterCommand } from "../constants";
 import BaseStep from "./baseStep";
-import { Prompt } from "../types";
+import { Prompt, TPromptIndex } from "../types";
 import prompts from "prompts";
 import fs from 'fs';
 import reasonKindTemplateContent from "../templates/reasonKindsTemplate"
-import { constructSumType, convertPascalCaseToSnakeCase, findIndexOfXAfterY, migrationFileAlreadyCreated, runMigrationCommand, tab, trimStringArr } from "../utils";
+import { addNullaryTypeToSumType, constructSumType, convertPascalCaseToSnakeCase, findIndexOfXAfterY, migrationFileAlreadyCreated, runMigrationCommand, tab, trimStringArr } from "../utils";
 
 export default class ReasonKindsStep extends BaseStep {
   private fileContent: string[] = [];
   private reasonKindsData: Record<string, string> = {}
-  private promptOne: Prompt = {
-    id: 'reason-kinds',
-    message: "Reason kinds for your vulcan workflow? (format: {ReasonName} {ReasonOptions (optional)}. enter 'q' to finish)",
-    type: "text",
+  private reasonOptions: Record<string, {name: string, comment: string}[]> = {}
+  
+  promptOne: TPromptIndex = {
+    prompts: {
+      id: 'reason-kinds',
+      message: "Reason kinds for your vulcan workflow? (format: {ReasonName} {ReasonOptions (optional)})",
+      type: "text",
+    },
     recursive: true,
-    required: true,
     handler: async () => await this.stepHandlers()
   }
-  private reasonOptions: Record<string, {name: string, comment: string}[]> = {}
-
-  prompts: Prompt[] = [this.promptOne];
 
   async stepHandlers() {
     this.parsePromptAnswers();
@@ -31,6 +31,7 @@ export default class ReasonKindsStep extends BaseStep {
     this.writeToFile()
     this.exportReasonKindsModule();
     this.createMigrationFile();
+    this.updateUQReasonKindFile();
     this.logger().reasonKindCreated();
   }
 
@@ -42,8 +43,15 @@ export default class ReasonKindsStep extends BaseStep {
   }
 
   // All the methods below are private and used internally within this step.
+  private get promptAnswers(): string[] {
+    if (this.promptOne.recursive === true) {
+      return this.promptOne.answer?.map(answer => answer['reason-kinds'].trim()) || [];
+    } 
+    return [];
+  }
+
   private parsePromptAnswers() {
-    const response = this.promptOne.answer?.split("|||").map(item => item.trim().split(" "))
+    const response = this.promptAnswers.map(item => item.trim().split(" "))
 
     if (!response || response.length === 0) {
       throw new Error("No reason kinds provided.");
@@ -65,27 +73,37 @@ export default class ReasonKindsStep extends BaseStep {
   }
 
   private async promptUserForReasonOptionsAndSaveResults(reasonOption: string) {
-    const reasonOptionResponse = await prompts({
-      type: 'text',
-      name: reasonOption,
-      message: `Please provide an option for reason kind "${reasonOption}" (or 'q' to quit):`,
-    })
-
-    const answer = reasonOptionResponse[reasonOption]?.trim();
-    if (answer === 'q') return
-
-    const reasonDescription = await prompts({
-      type: 'text',
-      name: 'description',
-      message: `Please provide a description for reason kind option "${answer}":`,
-    });
-
-    this.reasonOptions[reasonOption] = [
-      ...(this.reasonOptions[reasonOption] || []), 
-      {name: answer, comment: reasonDescription.description.trim() || ""}
-    ]
+    const responses = await prompts([
+      {
+        type: 'text',
+        name: reasonOption,
+        message: `Please provide options for reason kind "${reasonOption}" `,
+        validate: v => v.trim() ? true : 'Option cannot be empty.',
+      },
+      {
+        type: 'text',
+        name: 'description',
+        message: `Please provide a description for reason kind (used for haddock comments):`,
+        validate: v => v.trim() ? true : 'Description cannot be empty.',
+      },
+      {
+        type: 'select',
+        name: 'add-another',
+        message: 'Do you want to add another option for this reason kind?',
+        choices: [
+          { title: 'Yes', value: true },
+          { title: 'No', value: false }
+        ],
+        initial: 1,
+      }
+    ])
     
-    await this.promptUserForReasonOptionsAndSaveResults(reasonOption);
+    this.reasonOptions[reasonOption] = [
+      ...this.reasonOptions[reasonOption] || [],
+      {name: responses[reasonOption].trim(), comment: responses.description.trim() || ""}
+    ]
+
+    if (responses['add-another'] === true) await this.promptUserForReasonOptionsAndSaveResults(reasonOption);
   }
 
   private generateFileContent() {
@@ -126,6 +144,25 @@ export default class ReasonKindsStep extends BaseStep {
       throw new Error(`Migration SQL file path not found for migration: ${this.migrationFileName}`);
     }
     fs.writeFileSync(migrationSqlFilePath, fileContentArray.join('\n'), 'utf-8');
+  }
+
+  private updateUQReasonKindFile() {
+    const uqName = `UnifiedQueue${this.workflowName}ReasonKind`;
+    let fileContent = fs.readFileSync(FilePaths.UQReasonKinds, 'utf-8').split('\n');
+    fileContent = addNullaryTypeToSumType(
+      fileContent, 
+      'UnifiedQueueReasonKind', 
+      `${uqName} ${this.workflowName}Reason`, 
+      `This represents the full disposition reason tree for ${this.readableWorkflowName} workflow.`
+    );
+
+    const targetIndex = findIndexOfXAfterY(fileContent, '\n', 'isConfirmedLargeFraud =');
+    fileContent.splice(targetIndex, 0, `${tab(1)}${uqName} _ -> False`);
+
+    const targetIndex2 = findIndexOfXAfterY(fileContent, '\n', 'isSuspectedLargeFraud =');
+    fileContent.splice(targetIndex2, 0, `${tab(1)}${uqName} _ -> False`);
+
+    fs.writeFileSync(FilePaths.UQReasonKinds, fileContent.join('\n'), 'utf-8');
   }
 
   private reasonOptionsToBeDefined() {

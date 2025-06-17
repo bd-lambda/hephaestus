@@ -1,4 +1,4 @@
-import { FilePaths, TabSize } from "./constants";
+import { derivingStockMarker, FilePaths, TabSize } from "./constants";
 import { execSync } from "child_process";
 import fs from "fs";
 import prompts from "prompts";
@@ -61,7 +61,7 @@ export const addStringArrayAfterString = (fileContent: string, targetString: str
 
 
   // Insert the new array right after the target string line
-  lines.splice(targetIndex + 1, 0, ...newArray.map(item => `  ${item}`));
+  lines.splice(targetIndex + 1, 0, ...newArray);
 
   return lines;
 }
@@ -160,22 +160,56 @@ type TNullaryTypeArgs = {
 }
 
 export const constructSumType = ({name, fields, deriving, comment}: TNullaryTypeArgs) => {
-  let content = '';
+  let content = '\n';
 
   if (comment) content += `-- | ${comment}\n`;
-  content += `data ${name} = ${name}\n`;
+  content += `data ${name}\n`;
   
   fields.forEach((field, i) => {
     const options = field.optionTypes ? field.optionTypes.join(' ') : '';
-    content += `${tab(1)}${i === 0 ? '=' : '|'} ${field.name} ${options}\n`;
-    if (field.description) content += `${tab(1)}-- ^ ${field.description}`;
-    content += '\n';
+    if (field.description) content += `${tab(1)}${i === 0 ? '=' : '|'} -- | ${field.description}\n`;
+    content += `${tab(2)}${field.name} ${options}\n`;
   });
 
   content += `${tab(1)}deriving stock (${deriving?.join(', ') || 'Show, Eq, Ord'})\n`;
 
   return content;
+}
 
+export const extractSumTypesFromFile = (fileContent: string[], dataTypeName: string): string[] => {
+  const startIndex = fileContent.findIndex(line => line.trim().startsWith(`data ${dataTypeName}`));
+  
+  if (startIndex === -1) throw new Error(`Data type ${dataTypeName} not found in the file.`);
+  const endIndex = findIndexOfXAfterY(fileContent, derivingStockMarker, `data ${dataTypeName}`);
+  if (endIndex === -1) throw new Error(`Deriving stock marker not found after data type ${dataTypeName}.`);
+
+  return fileContent
+          .slice(startIndex + 1, endIndex)
+          .filter(line => !line.includes('--') && line.trim().length > 0)
+          .map(line => line.replaceAll("\t", '').replaceAll(/\|?\=?/g, '').trim())
+}
+
+export const fetchRiskWorkflow = (): string[] => {
+  const fileContent = fs.readFileSync(FilePaths.RiskWorkflowPath, 'utf-8').split('\n');
+  return extractSumTypesFromFile(fileContent, 'RiskWorkflow');
+}
+
+export const fetchSlackChannels = (): string[] => {
+  const fileContent = fs.readFileSync(FilePaths.SlackChannelsPath, 'utf-8').split('\n');
+  return extractSumTypesFromFile(fileContent, 'SlackChannel');
+}
+
+export const addNullaryTypeToSumType = (fileContent: string[], dataTypeName: string, newVariant: string, comment?: string): string[] => {
+  const startIndex = fileContent.findIndex(line => line.trim().startsWith(`data ${dataTypeName}`));
+  if (startIndex === -1) throw new Error(`Data type ${dataTypeName} not found in the file.`);
+  const endIndex = findIndexOfXAfterY(fileContent, derivingStockMarker, `data ${dataTypeName}`);
+  if (endIndex === -1) throw new Error(`Deriving stock marker not found after data type ${dataTypeName}.`);
+
+  // Insert the new variant right before the line that is not a variant
+  const newLine = comment ? `${tab(1)}| -- | ${comment}\n${tab(2)+newVariant}` : `${tab(1)}| ${newVariant}`;
+  fileContent.splice(endIndex, 0, newLine);
+
+  return fileContent;
 }
 
 export const runCli = () => {
@@ -198,4 +232,8 @@ export const runCli = () => {
   r.context.addImport = addImport;
   r.context.constructRecordType = constructRecordType;
   r.context.constructSumType = constructSumType;
+  r.context.fetchRiskWorkflow = fetchRiskWorkflow;
+  r.context.fetchSlackChannels = fetchSlackChannels;
+  r.context.extractSumTypesFromFile = extractSumTypesFromFile;
+  r.context.addNullaryTypeToSumType = addNullaryTypeToSumType;
 }

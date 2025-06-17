@@ -1,28 +1,36 @@
-import { Prompt } from "../types";
+import { TPromptIndex } from "../types";
 import fs from 'fs';
 import { addStringArrayAfterString, capitalize, constructSumType, convertPascalCaseToSnakeCase, findIndexOfXAfterY, migrationFileAlreadyCreated, runMigrationCommand, tab } from "../utils";
-import { FilePaths, NativeItemKindJSONMarker, NativeItemKindsAlterCommand, NativeItemKindsSuffix, NativeItemKindsTargetMarker } from "../constants";
+import { derivingStockMarker, FilePaths, ItemKindSuffix, NativeItemKindJSONMarker, NativeItemKindsAlterCommand, NativeItemKindsSuffix, NativeItemKindsTargetMarker, UQItemKindMarker } from "../constants";
 import BaseStep from "./baseStep";
 
 export default class NativeItemKindsStep extends BaseStep {
   private updatedContent: string[] = [];
   private fileContent: string = ''
 
-  promptOne: Prompt = {
-    id: 'native-item-kinds',
-    message: "Native item kinds for your vulcan workflow? (format: name - description. enter 'q' to finish)",
-    type: "text",
+  promptOne: TPromptIndex = {
+    prompts: [
+      {
+        id: 'native-item-kinds',
+        message: "Enter a native item kind for your vulcan workflow?",
+        type: "text",
+      },
+      {
+        id: 'native-item-kinds-description',
+        message: "Please provide a description, this is needed for haddock documentation.",
+        type: prev => prev === 'q' ? null : "text",
+      }
+    ],
     handler: async () => await this.stepHandlers(),
     recursive: true
   };
-
-  prompts = [this.promptOne];
 
   async stepHandlers() {
     this.loadFileContent()
     this.createNativeItemKinds()
     this.generateJSONAndTypescriptForNativeItemKinds();
     this.writeUpdatedContentToFile();
+    this.registerItemKindInUQItemKindFile()
     this.createMigrationFile();
     this.logger().nativeItemKindsAdded();
   }
@@ -33,6 +41,15 @@ export default class NativeItemKindsStep extends BaseStep {
   }
 
   // All the methods below are private and used internally within this step.
+  private get promptAnswers(): string[] {
+    if (this.promptOne.recursive === true) {
+      return this.promptOne.answer?.map(answer => {
+        return `${answer['native-item-kinds'].trim()} - ${answer['native-item-kinds-description'].trim()}`
+      }) || [];
+    } 
+    return [];
+  }
+
   private generateJSONAndTypescriptForNativeItemKinds() {
     if (this.JSONAndTypescriptAlreadyGenerated()) return;
 
@@ -48,7 +65,7 @@ export default class NativeItemKindsStep extends BaseStep {
   }
 
   private createNativeItemKinds() {
-    const nativeItemKindsData = this.promptOne.answer?.split("|||")
+    const nativeItemKindsData = this.promptAnswers
     
     if (!nativeItemKindsData || nativeItemKindsData.length === 0) {
       throw new Error("No native item kinds provided.");
@@ -94,7 +111,7 @@ export default class NativeItemKindsStep extends BaseStep {
   }
 
   private nativeItemKinds() {
-    return this.promptOne.answer?.split("|||").map(kind => {
+    return this.promptAnswers.map(kind => {
       const [name, _] = kind.split(' - ').map(part => part.trim());
       return capitalize(name || '')
     }) || []
@@ -121,6 +138,17 @@ export default class NativeItemKindsStep extends BaseStep {
 
   private isMigrationFileAlreadyCreated(): boolean {
     return migrationFileAlreadyCreated(this.migrationFileName)
+  }
+
+  private registerItemKindInUQItemKindFile() {
+    const contentArr = fs.readFileSync(FilePaths.UQItemKindPath, 'utf-8').split('\n');
+    const targetIndex = findIndexOfXAfterY(contentArr, derivingStockMarker, UQItemKindMarker);
+    if (targetIndex === -1) {
+      throw new Error(`Could not properly parse file: ${FilePaths.UQItemKindPath}`);
+    }
+    const newItemKind = `${tab(1)}| UnifiedQueue${this.workflowName + ItemKindSuffix} ${this.dataTypeName}`;
+    contentArr.splice(targetIndex, 0, newItemKind);
+    fs.writeFileSync(FilePaths.UQItemKindPath, contentArr.join('\n'), 'utf-8');
   }
 
   private logger() {

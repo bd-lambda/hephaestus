@@ -1,14 +1,17 @@
-import { Prompt } from "../types";
+import { Prompt, TPromptIndex } from "../types";
 import fs from 'fs';
 import { addVariantToHaskellDataType, capitalize, tab } from "../utils";
 import { FilePaths } from "../constants";
 import BaseStep from "./baseStep";
 
 export default class WorkflowIntroductionStep extends BaseStep {
-  promptOne: Prompt = {
-    id: 'workflow-name',
-    message: "What is the name of your vulcan workflow?",
-    type: "text",
+  promptOne: TPromptIndex = {
+    prompts: {
+      id: 'workflow-name',
+      message: "What is the name of your vulcan workflow?",
+      type: "text",
+    },
+    recursive: false,
     handler: async () => await this.stepHandlers()
   }
 
@@ -25,6 +28,10 @@ export default class WorkflowIntroductionStep extends BaseStep {
   }
 
   // All the methods below are private and used internally within this step.
+  private get promptAnswer(): string | undefined {
+    if (this.promptOne.recursive === false) return this.promptOne.answer?.['workflow-name'].trim();
+  } 
+
   private workflowNameRecieved() {
     this.createVulcanAdpaterInstanceFile()
     this.logger().adapterFileCreated()
@@ -54,10 +61,10 @@ export default class WorkflowIntroductionStep extends BaseStep {
   }
 
   private getWorkflowName () {
-    if (!this.promptOne.answer) {
+    if (!this.promptAnswer) {
       throw new Error("Workflow name has not been set.");
     }
-    return capitalize(this.promptOne.answer);
+    return capitalize(this.promptAnswer);
   }
 
   private createVulcanAdpaterInstanceFile() {

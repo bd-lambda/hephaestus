@@ -1,25 +1,30 @@
-import { Prompt } from "../types";
+import { Prompt, TPromptIndex } from "../types";
 import BaseStep from "./baseStep";
 
 export default class GenerateTypescriptStep extends BaseStep {
-  prompOne: Prompt = {
-    id: 'generate-typescript',
-    message: "Would you like to generate the typescript for your new workflow (yes/no)",
-    type: "select",
-    initial: 1,
-    choices: [
-      { title: "No", value: 'n' },
-      { title: "Yes", value: 'y' },
-    ],
+  promptOne: TPromptIndex = {
+    prompts: {
+      id: 'generate-typescript',
+      message: "Would you like to generate the typescript for your new workflow (yes/no)",
+      type: "select",
+      initial: 1,
+      choices: [
+        { title: "No", value: 'n' },
+        { title: "Yes", value: 'y' },
+      ]
+    },
+    recursive: false,
     handler: async () => await this.stepHandlers()
   }
 
-  prompts: Prompt[] = [this.prompOne];
-
   storeArtifacts(): void {}
 
+  private get promptAnswer(): string | undefined {
+    if (this.promptOne.recursive === false) return this.promptOne.answer?.['generate-typescript'].trim();
+  }
+
   async stepHandlers() {
-    if (this.prompOne.answer === 'n') return this.logger().skipTypescriptGeneration();
+    if (this.promptAnswer === 'n') return this.logger().skipTypescriptGeneration();
 
     this.generateTypescriptFile();
     this.logger().typescriptFileGenerated();
