@@ -7,6 +7,7 @@ import { runCli } from "./utils";
 import WorkflowDispositionStep from "./steps/workflowDispositionStep";
 import GenerateTypescriptStep from "./steps/generateTypescriptStep";
 import DetailsDataStep from "./steps/detailsDataStep";
+import WorkflowInstantiationStep from "./steps/workflowInstantiationStep";
 
 export async function runCreateVulcanWorkflow() {
   const data: {artifacts: Artifacts} = {artifacts: {}};
@@ -16,6 +17,7 @@ export async function runCreateVulcanWorkflow() {
     ReasonKindsStep,
     WorkflowDispositionStep,
     DetailsDataStep,
+    WorkflowInstantiationStep,
     // GenerateTypescriptStep
   ]
 

@@ -156,10 +156,10 @@ export default class ReasonKindsStep extends BaseStep {
       `This represents the full disposition reason tree for ${this.readableWorkflowName} workflow.`
     );
 
-    const targetIndex = findIndexOfXAfterY(fileContent, '\n', 'isConfirmedLargeFraud =');
+    const targetIndex = findIndexOfXAfterY(fileContent, '', 'isConfirmedLargeFraud =');
     fileContent.splice(targetIndex, 0, `${tab(1)}${uqName} _ -> False`);
 
-    const targetIndex2 = findIndexOfXAfterY(fileContent, '\n', 'isSuspectedLargeFraud =');
+    const targetIndex2 = findIndexOfXAfterY(fileContent, '', 'isSuspectedLargeFraud =');
     fileContent.splice(targetIndex2, 0, `${tab(1)}${uqName} _ -> False`);
 
     fs.writeFileSync(FilePaths.UQReasonKinds, fileContent.join('\n'), 'utf-8');

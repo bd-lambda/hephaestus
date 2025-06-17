@@ -1,7 +1,7 @@
 import { FilePaths, ItemDispositionMarker } from "../constants";
-import { dispositionAdapter, matchFunction } from "../templates/utilsTemplate";
+import { dispositionAdapter, matchFunction, runWithAdapterLine } from "../templates/utilsTemplate";
 import { TPromptIndex } from "../types";
-import { addNullaryTypeToSumType, fetchRiskWorkflow, fetchSlackChannels, findIndexOfXAfterY, tab } from "../utils";
+import { addNullaryTypeToSumType, convertPascalCaseToSnakeCase, fetchRiskWorkflow, fetchSlackChannels, findIndexOfXAfterY, runMigrationCommand, tab } from "../utils";
 import BaseStep from "./baseStep";
 import fs from 'fs';
 import workflowInstanceTemplate from '../templates/workflowInstanceTemplate';
@@ -46,7 +46,10 @@ export default class WorkflowInstantiationStep extends BaseStep {
 
     await this.createOutcomesIfNecessary();
     await this.updateOutcomeActionHelpersFile();
+    await this.updateOutcomeActionFile();
+    await this.createOutcomeMigrationsIfNecessary();
     await this.createWorkflowInstanceFile();
+    this.logger().workflowInstantiated();
   }
 
   private async registerWorkflowKind() {
@@ -56,7 +59,7 @@ export default class WorkflowInstantiationStep extends BaseStep {
 
   private async registerPermissions() {
     const content = this.updatedWFKFileContent.split('\n');
-    const targetIndex = findIndexOfXAfterY(content, '\n', 'permissionForWorkflowKind =')
+    const targetIndex = findIndexOfXAfterY(content, '', 'permissionForWorkflowKind =')
     if (targetIndex === -1) throw new Error(`Could not find the target index for permissionForWorkflowKind in ${FilePaths.UQWorkflowKindPath}`);
     content.splice(targetIndex, 0, `${tab(1)}${this.workflowKind}->\n${tab(2)+this.permissionKind}`);
     this.updatedWFKFileContent = content.join('\n');
@@ -64,9 +67,9 @@ export default class WorkflowInstantiationStep extends BaseStep {
 
   private registerSlackChannel() {
     const content = this.updatedWFKFileContent.split('\n');
-    const targetIndex = findIndexOfXAfterY(content, '\n', 'alertChannelForWorkflowKind =')
+    const targetIndex = findIndexOfXAfterY(content, '', 'alertChannelForWorkflowKind =')
     if (targetIndex === -1) throw new Error(`Could not find the target index for alertChannelForWorkflowKind in ${FilePaths.UQWorkflowKindPath}`);
-    content.splice(targetIndex, 0, `${tab(1)}${this.workflowKind}->\n${tab(2)}"${this.slackName}"`);
+    content.splice(targetIndex, 0, `${tab(1)}${this.workflowKind} ->\n${tab(2)}${this.slackName}`);
     this.updatedWFKFileContent = content.join('\n');
   }
 
@@ -78,14 +81,19 @@ export default class WorkflowInstantiationStep extends BaseStep {
   private async updateUtilsFile() {
     const fileContent = fs.readFileSync(FilePaths.UQUtilsFile, 'utf-8').split('\n');
     const targetIndex = findIndexOfXAfterY(fileContent, 'where', ItemDispositionMarker);
-    if (targetIndex === -1) throw new Error(`Could not find the target index for ${ItemDispositionMarker} in ${FilePaths.UQUtilsFile}`);
-
+    if (targetIndex === -1) throw new Error(`Could not properly parse ${FilePaths.UQUtilsFile} file`);
     fileContent.splice(targetIndex, 0, `${tab(1)}${dispositionAdapter.replaceAll('{{workflow_name}}', this.workflowName)}`);
-    const matchFunctionText = matchFunction.replaceAll('{{workflow_name}}', this.workflowName)
-    const targetIndex2 = findIndexOfXAfterY(fileContent, '_ -> Nothing', 'where');
-    if (targetIndex2 === -1) throw new Error(`Could not find the target index for '_ -> Nothing' in ${FilePaths.UQUtilsFile}`);
 
-    fileContent.splice(targetIndex2 + 1, 0, `\n${matchFunctionText}`);
+    const matchFunctionText = matchFunction.replaceAll('{{workflow_name}}', this.workflowName) + '\n'
+    const targetIndex2 = findIndexOfXAfterY(fileContent, 'where', ItemDispositionMarker);
+    if (targetIndex2 === -1) throw new Error(`Could not properly parse ${FilePaths.UQUtilsFile} file`);
+    fileContent.splice(targetIndex2 + 1, 0, `${matchFunctionText}`);
+
+    const runWithAdapterText = runWithAdapterLine.replaceAll('{{workflow_name}}', this.workflowName)
+    const targetIndex3 = findIndexOfXAfterY(fileContent, '', 'runWithAdapter itemKind action =');
+    if (targetIndex3 === -1) throw new Error(`Could not properly parse ${FilePaths.UQUtilsFile} file`);
+    fileContent.splice(targetIndex3, 0, `${tab(1)}${runWithAdapterText}`);
+
     fs.writeFileSync(FilePaths.UQUtilsFile, fileContent.join('\n'), 'utf-8');
   }
 
@@ -96,11 +104,11 @@ export default class WorkflowInstantiationStep extends BaseStep {
     this.outcomes.forEach(outcome => {
       outcomesFileContent = addNullaryTypeToSumType(outcomesFileContent, 'UnifiedQueueOutcomeKind', outcome.outcome, outcome.description);
       
-      const targetIndex = findIndexOfXAfterY(outcomesFileContent, '\n', 'isPendingOutcome = ');
+      const targetIndex = findIndexOfXAfterY(outcomesFileContent, '', 'isPendingOutcome = ');
       if (targetIndex === -1) throw new Error(`Could not find the target index for isPendingOutcome in ${FilePaths.UQOutcomeKindPath}`);
       outcomesFileContent.splice(targetIndex, 0, `${tab(1)}${outcome.outcome} -> ${outcome.isPending ? 'True' : 'False'}`);
 
-      const targetIndex2 = findIndexOfXAfterY(outcomesFileContent, '\n', 'outcomeCanBeReActioned =');
+      const targetIndex2 = findIndexOfXAfterY(outcomesFileContent, '', 'outcomeCanBeReActioned =');
       if (targetIndex2 === -1) throw new Error(`Could not find the target index for outcomeCanBeReActioned in ${FilePaths.UQOutcomeKindPath}`);
       outcomesFileContent.splice(targetIndex2, 0, `${tab(1)}${outcome.outcome} -> ${outcome.reactionable ? 'True' : 'False'}`);
     })
@@ -113,7 +121,7 @@ export default class WorkflowInstantiationStep extends BaseStep {
     let fileContent = fs.readFileSync(FilePaths.OutcomeActionHelpersPath, 'utf-8').split('\n');
 
     this.outcomes.forEach(outcome => {
-      const targetIndex = findIndexOfXAfterY(fileContent, '\n', 'unifiedQueueOutcomeToRiskAlertDecision = ');
+      const targetIndex = findIndexOfXAfterY(fileContent, '', 'unifiedQueueOutcomeToRiskAlertDecision = ');
       if (targetIndex === -1) throw new Error(`Could not find the target index for unifiedQueueOutcomeToRiskAlertDecision in ${FilePaths.OutcomeActionHelpersPath}`);
       fileContent.splice(targetIndex, 0, `${tab(1)}${outcome.outcome} -> RaaOther`);
     })
@@ -121,11 +129,46 @@ export default class WorkflowInstantiationStep extends BaseStep {
     fs.writeFileSync(FilePaths.OutcomeActionHelpersPath, fileContent.join('\n'), 'utf-8');
   }
 
+  private async updateOutcomeActionFile() {
+    if (this.outcomes.length === 0) return;
+    let fileContent = fs.readFileSync(FilePaths.OutcomeActionsFilePath, 'utf-8').split('\n');
+
+    this.outcomes.forEach(outcome => {
+      const targetIndex = findIndexOfXAfterY(fileContent, 'where', 'performOutcomeSideEffect presigner item ');
+      if (targetIndex === -1) throw new Error(`Could not find the target index for unifiedQueueOutcomeToRiskAlertAction in ${FilePaths.OutcomeActionsFilePath}`);
+      fileContent.splice(targetIndex, 0, `${tab(1)}${outcome.outcome} -> doNothing`);
+    })
+
+    fs.writeFileSync(FilePaths.OutcomeActionsFilePath, fileContent.join('\n'), 'utf-8');
+  }
+
+  private async createOutcomeMigrationsIfNecessary() {
+    if (this.outcomes.length === 0) return;
+    const {migrationSqlFilePath} = runMigrationCommand(`add_${convertPascalCaseToSnakeCase(this.workflowName)}_outcomes`);
+    if (!migrationSqlFilePath) {
+      throw new Error(`Migration SQL file path not found for workflow: ${this.workflowName}`);
+    }
+    const fileContent = fs.readFileSync(migrationSqlFilePath, 'utf-8').split('\n');
+    this.outcomes.forEach(outcome => {
+      const command = `ALTER TYPE "unified_queue_outcome_kind" ADD VALUE '${outcome.outcome}';`;
+      fileContent.push(command);
+    });
+    fs.writeFileSync(migrationSqlFilePath, fileContent.join('\n'), 'utf-8');
+  }
+
   private async createWorkflowInstanceFile() {
     const filePath = `${FilePaths.VulcanAdapterInstance}${this.workflowName}.hs`;
     if (fs.existsSync(filePath)) return;
     const fileContent = workflowInstanceTemplate.replaceAll('{{workflow_name}}', this.workflowName)
     fs.writeFileSync(filePath, fileContent, 'utf-8');
+  }
+
+  private logger() {
+    return {
+      workflowInstantiated: () => {
+        console.log(`🚀 Workflow successfully instantiated.`);
+      }
+    }
   }
 
   private async runPromptForOutcomes() {
@@ -146,8 +189,8 @@ export default class WorkflowInstantiationStep extends BaseStep {
         name: 'is-pending',
         message: 'Does this outcome represent a pending state?',
         choices: [
-          { title: 'Yes', value: true },
-          { title: 'No', value: false }
+          { title: 'Yes', value: 'y' },
+          { title: 'No', value: 'n' }
         ],
         initial: 1,
       },
@@ -156,8 +199,8 @@ export default class WorkflowInstantiationStep extends BaseStep {
         name: 'can-be-reactioned',
         message: 'Can this outcome be re-actioned?',
         choices: [
-          { title: 'Yes', value: true },
-          { title: 'No', value: false }
+          { title: 'Yes', value: 'y' },
+          { title: 'No', value: 'n' }
         ],
         initial: 1,
       },
@@ -166,8 +209,8 @@ export default class WorkflowInstantiationStep extends BaseStep {
         name: 'add-another',
         message: 'Do you want to add another outcome?',
         choices: [
-          { title: 'Yes', value: true },
-          { title: 'No', value: false }
+          { title: 'Yes', value: 'y' },
+          { title: 'No', value: 'n' }
         ],
         initial: 1,
       }
@@ -178,11 +221,11 @@ export default class WorkflowInstantiationStep extends BaseStep {
     this.outcomes.push({
       outcome: response.outcome.trim(),
       description: response['outcome-description']?.trim() || '',
-      isPending: response['is-pending'] || false,
-      reactionable: response['can-be-reactioned'] || false
+      isPending: response['is-pending'] === 'y',
+      reactionable: response['can-be-reactioned'] === 'n'
     });
 
-    if (response['add-another'] === true) await this.runPromptForOutcomes();
+    if (response['add-another'] === 'y') await this.runPromptForOutcomes();
   }
 
   private get workflowKind(): string {

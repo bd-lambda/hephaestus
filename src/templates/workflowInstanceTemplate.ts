@@ -1,7 +1,7 @@
 const content = `
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
-module Mercury.Risk.UnifiedQueue.Adapter.Instance.{{worklow_name}} where
+module Mercury.Risk.UnifiedQueue.Adapter.Instance.{{workflow_name}} where
 
 import A.MercuryPrelude
 import Mercury.Database.Monad (runDB)
@@ -9,14 +9,14 @@ import Mercury.Risk.UnifiedQueue.Adapter.Class (UnifiedQueueAdapter (..), Unifie
 import Mercury.Risk.UnifiedQueue.DetailsData
   ( UnifiedQueueDetailsError (..),
     UnifiedQueueItemDetailsData (..),
-    UnifiedQueue{{worklow_name}}DetailsData (..),
+    UnifiedQueue{{workflow_name}}DetailsData (..),
   )
 import Mercury.Risk.UnifiedQueue.DispositionData (UnifiedQueueDispositionData (..))
-import Mercury.Risk.UnifiedQueue.DispositionData.{{worklow_name}}Disposition
+import Mercury.Risk.UnifiedQueue.DispositionData.{{workflow_name}}Disposition
 import Model.Prose (literalProse)
-import Model.UnifiedQueue.DispositionVersion.{{worklow_name}}DispositionVersion ({{worklow_name}}Version (..), toNullaryEnum)
-import Model.UnifiedQueue.NativeItemKinds ({{worklow_name}}ItemType (..))
-import Model.UnifiedQueue.ReasonKinds.{{worklow_name}}Reason ({{worklow_name}}Reason (..))
+import Model.UnifiedQueue.DispositionVersion.{{workflow_name}}DispositionVersion ({{workflow_name}}Version (..), toNullaryEnum)
+import Model.UnifiedQueue.NativeItemKinds ({{workflow_name}}ItemType (..))
+import Model.UnifiedQueue.ReasonKinds.{{workflow_name}}Reason ({{workflow_name}}Reason (..))
 import Model.UnifiedQueue.UnifiedQueueAdapterSpecificError (UnifiedQueueAdapterSpecificError (..))
 import Model.UnifiedQueue.UnifiedQueueDispositionVersion (UnifiedQueueDispositionVersion (..))
 import Model.UnifiedQueue.UnifiedQueueItemKind (UnifiedQueueItemKind (..))
@@ -27,13 +27,13 @@ import PersistentModels.Organization (OrganizationId)
 import PersistentModels.UnifiedQueueAlertItem (UnifiedQueueAlertItem (..))
 import PersistentModels.Alert (Alert)
 
-instance UnifiedQueueAdapter 'UnifiedQueue{{worklow_name}}Subsystem where
-  type SubsystemItemKind 'UnifiedQueue{{worklow_name}}Subsystem = {{worklow_name}}ItemType
-  makeUnifiedQueueItemKind = UnifiedQueue{{worklow_name}}ItemKind
+instance UnifiedQueueAdapter 'UnifiedQueue{{workflow_name}}Subsystem where
+  type SubsystemItemKind 'UnifiedQueue{{workflow_name}}Subsystem = {{workflow_name}}ItemType
+  makeUnifiedQueueItemKind = UnifiedQueue{{workflow_name}}ItemKind
   itemToWorkflowKind = const MoneyMovementErrorWorkflow
 
-  type SubsystemReasonKind 'UnifiedQueue{{worklow_name}}Subsystem = {{worklow_name}}Reason
-  makeUnifiedQueueReasonKind = UnifiedQueue{{worklow_name}}ReasonKind
+  type SubsystemReasonKind 'UnifiedQueue{{workflow_name}}Subsystem = {{workflow_name}}Reason
+  makeUnifiedQueueReasonKind = UnifiedQueue{{workflow_name}}ReasonKind
 
   validateDisposition _ _ = pure ()
 
@@ -42,20 +42,20 @@ instance UnifiedQueueAdapter 'UnifiedQueue{{worklow_name}}Subsystem where
 
   validateOutcomes _ _ _ = pure ()
 
-  type SubsystemApiDispositionData 'UnifiedQueue{{worklow_name}}Subsystem = {{worklow_name}}Disposition
-  type SubsystemLatestApiDispositionData 'UnifiedQueue{{worklow_name}}Subsystem = {{worklow_name}}DispositionV1Data
-  makeApiDispositionData = UnifiedQueue{{worklow_name}}Disposition
+  type SubsystemApiDispositionData 'UnifiedQueue{{workflow_name}}Subsystem = {{workflow_name}}Disposition
+  type SubsystemLatestApiDispositionData 'UnifiedQueue{{workflow_name}}Subsystem = {{workflow_name}}DispositionV1Data
+  makeApiDispositionData = UnifiedQueue{{workflow_name}}Disposition
   toApiDispositionData _ _ _ = Left $ literalProse @"Not yet implemented"
   fromApiDispositionData _ _ = Left $ literalProse @"Not yet implemented"
 
   ensureLatestApiDispositionData _ _ = Left $ literalProse @"Not yet implemented"
 
-  type SubsystemApiDispositionVersion 'UnifiedQueue{{worklow_name}}Subsystem = {{worklow_name}}Version
-  makeUnifiedQueueVersion = UnifiedQueue{{worklow_name}}Version
-  getCurrentVersion = const {{worklow_name}}VersionV1
+  type SubsystemApiDispositionVersion 'UnifiedQueue{{workflow_name}}Subsystem = {{workflow_name}}Version
+  makeUnifiedQueueVersion = UnifiedQueue{{workflow_name}}Version
+  getCurrentVersion = const {{workflow_name}}VersionV1
   getVersionFromDispositionData = toNullaryEnum
 
-  type UnifiedQueueCreationData 'UnifiedQueue{{worklow_name}}Subsystem = OrganizationId
+  type UnifiedQueueCreationData 'UnifiedQueue{{workflow_name}}Subsystem = OrganizationId
   getItemPriority = const $ clampToUnifiedQueueItemPriority 50
   getOrganizationId orgId = orgId
 
@@ -63,12 +63,12 @@ instance UnifiedQueueAdapter 'UnifiedQueue{{worklow_name}}Subsystem where
 
   notifyOnCreate _ _ _ = pure Nothing
 
-  type SubsystemItemModel 'UnifiedQueue{{worklow_name}}Subsystem = Alert
-  type SubsystemItemLinkModel 'UnifiedQueue{{worklow_name}}Subsystem = UnifiedQueueAlertItem
+  type SubsystemItemModel 'UnifiedQueue{{workflow_name}}Subsystem = Alert
+  type SubsystemItemLinkModel 'UnifiedQueue{{workflow_name}}Subsystem = UnifiedQueueAlertItem
   buildSubsystemLink itemId alertId _ = UnifiedQueueAlertItem itemId alertId
 
-  type SubsystemDetailsData 'UnifiedQueue{{worklow_name}}Subsystem = UnifiedQueue{{worklow_name}}DetailsData
-  makeUnifiedQueueItemDetailsData = UnifiedQueue{{worklow_name}}Details
+  type SubsystemDetailsData 'UnifiedQueue{{workflow_name}}Subsystem = UnifiedQueue{{workflow_name}}DetailsData
+  makeUnifiedQueueItemDetailsData = UnifiedQueue{{workflow_name}}Details
   getSubsystemDetailsData _ = pure $ Left (DetailsAdapterError $ UnifiedQueueAdapterSpecificError $ literalProse @"Not yet implemented")
 
   -- INFORMATION REQUESTS
