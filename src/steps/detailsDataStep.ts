@@ -3,7 +3,7 @@ import prompts from "prompts";
 import fs from 'fs';
 import BaseStep from "./baseStep";
 import { derivingStockMarker, DetailsDataDefinitionMarker, FilePaths, TSLineMarker } from "../constants";
-import { addImport, constructRecordType, findIndexOfXAfterY, lastIndexOf, tab } from "../utils";
+import { addImport, constructRecordType, insertXIntoYAfterZ, lastIndexOf, tab } from "../utils";
 
 export default class DetailsDataStep extends BaseStep {
   fileContent: string = ''
@@ -54,27 +54,15 @@ export default class DetailsDataStep extends BaseStep {
   }
 
   private exportDetailsDataModule() {
-    const targetIndex = findIndexOfXAfterY(this.fileContentArr, ')', '(')
-    if (targetIndex === -1) {
-      throw new Error(`Could not correct parse file: ${FilePaths.DetailsDataPath}`);
-    }
-
-    this.fileContentArr.splice(targetIndex, 0, `${tab(2) + this.dataTypeName} (..),`);
+    insertXIntoYAfterZ(this.fileContentArr, `${tab(2) + this.dataTypeName} (..),`, ')', '(');
   }
 
   private addModuleToDetailsDataDefinition() {
-    const targetIndex = findIndexOfXAfterY(this.fileContentArr, derivingStockMarker, DetailsDataDefinitionMarker);
-    if (targetIndex === -1) {
-      throw new Error(`Could not find target marker "${derivingStockMarker}" in file: ${FilePaths.DetailsDataPath}`);
-    }
-
-    this.fileContentArr.splice(targetIndex, 0, `${tab(1)}| ${this.dataTypeName.replace('Data', '')} ${this.dataTypeName}`);
+    insertXIntoYAfterZ(this.fileContentArr, `${tab(1)}| ${this.dataTypeName.replace('Data', '')} ${this.dataTypeName}`, derivingStockMarker, DetailsDataDefinitionMarker);
   }
 
   private addDetailsModuleDataType() {
-    let targetIndex = findIndexOfXAfterY(this.fileContentArr, TSLineMarker, derivingStockMarker);
-    targetIndex = targetIndex === -1 ? this.fileContentArr.length : targetIndex;
-    this.fileContentArr.splice(targetIndex, 0, this.generateDetailsDataModule())
+    insertXIntoYAfterZ(this.fileContentArr, this.generateDetailsDataModule(), TSLineMarker, derivingStockMarker);
   }
 
   private addGenerateTsLine() {

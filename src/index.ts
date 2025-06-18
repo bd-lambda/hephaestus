@@ -18,7 +18,7 @@ export async function runCreateVulcanWorkflow() {
     WorkflowDispositionStep,
     DetailsDataStep,
     WorkflowInstantiationStep,
-    // GenerateTypescriptStep
+    GenerateTypescriptStep
   ]
 
 

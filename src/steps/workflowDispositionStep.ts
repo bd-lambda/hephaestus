@@ -1,6 +1,6 @@
 import { derivingStockMarker, FilePaths, ModulePaths } from "../constants";
 import { TPromptIndex } from "../types";
-import { addImport, addNullaryTypeToSumType, constructRecordType, convertPascalCaseToSnakeCase, findIndexOfXAfterY, lowerFirstLetter, migrationFileAlreadyCreated, pascalCaseToReadable, runMigrationCommand, tab, trimStringArr } from "../utils";
+import { addImport, addNullaryTypeToSumType, constructRecordType, convertPascalCaseToSnakeCase, findIndexOfXAfterY, insertXIntoYAfterZ, lowerFirstLetter, migrationFileAlreadyCreated, pascalCaseToReadable, runMigrationCommand, tab, trimStringArr } from "../utils";
 import BaseStep from "./baseStep";
 import fs from 'fs';
 import workflowDispositionTemplate from '../templates/dispositionTemplate'
@@ -46,13 +46,8 @@ export default class WorkflowDispositionStep extends BaseStep {
     this.dispositionDataFileContent = fs.readFileSync(FilePaths.DispositionDataPath, 'utf-8');
     if (this.dispositionDataFileContent.includes(this.dispositionDataTypeAndValue)) return
     const contentArr = this.dispositionDataFileContent.split('\n')
-    const targetIndex = findIndexOfXAfterY(contentArr, derivingStockMarker, 'data UnifiedQueueDispositionData');
-    
-    if (targetIndex === -1) {
-      throw new Error(`Could not properly parse the disposition data file: ${FilePaths.DispositionDataPath}`);
-    }
 
-    contentArr.splice(targetIndex, 0, `${tab(1)}| ${this.dispositionDataTypeAndValue}`);
+    insertXIntoYAfterZ(contentArr, `${tab(1)}| ${this.dispositionDataTypeAndValue}`, derivingStockMarker, 'data UnifiedQueueDispositionData')
     fs.writeFileSync(FilePaths.DispositionDataPath, contentArr.join('\n'));
   }
 
@@ -89,12 +84,7 @@ export default class WorkflowDispositionStep extends BaseStep {
     const fileArr = trimStringArr(fileContent.split('\n'));
     fileArr.push(importLine);
 
-    const targetIndex = findIndexOfXAfterY(fileArr, ')', '(');
-    if (targetIndex === -1) {
-      throw new Error(`could not properly parse the disposition data file: ${FilePaths.AllDispositionDataPath}`);
-    }
-
-    fileArr.splice(targetIndex, 0, `${tab(2)}${this.dispositionDataValue},`);
+    insertXIntoYAfterZ(fileArr, `${tab(2)}${this.dispositionDataValue},`, ')', '(');
     fs.writeFileSync(FilePaths.AllDispositionDataPath, fileArr.join('\n'), 'utf-8');
   }
 

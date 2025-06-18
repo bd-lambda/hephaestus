@@ -1,7 +1,7 @@
 import { FilePaths, ItemDispositionMarker } from "../constants";
 import { dispositionAdapter, matchFunction, runWithAdapterLine } from "../templates/utilsTemplate";
 import { TPromptIndex } from "../types";
-import { addNullaryTypeToSumType, convertPascalCaseToSnakeCase, fetchRiskWorkflow, fetchSlackChannels, findIndexOfXAfterY, runMigrationCommand, tab } from "../utils";
+import { addNullaryTypeToSumType, convertPascalCaseToSnakeCase, fetchRiskWorkflow, fetchSlackChannels, insertXIntoYAfterZ, runMigrationCommand, tab } from "../utils";
 import BaseStep from "./baseStep";
 import fs from 'fs';
 import workflowInstanceTemplate from '../templates/workflowInstanceTemplate';
@@ -42,13 +42,13 @@ export default class WorkflowInstantiationStep extends BaseStep {
     await this.registerSlackChannel();
     await this.updateWorkflowKindFile();
 
-    await this.updateUtilsFile();
-
+    
     await this.createOutcomesIfNecessary();
     await this.updateOutcomeActionHelpersFile();
     await this.updateOutcomeActionFile();
     await this.createOutcomeMigrationsIfNecessary();
     await this.createWorkflowInstanceFile();
+    await this.updateUtilsFile();
     this.logger().workflowInstantiated();
   }
 
@@ -59,17 +59,13 @@ export default class WorkflowInstantiationStep extends BaseStep {
 
   private async registerPermissions() {
     const content = this.updatedWFKFileContent.split('\n');
-    const targetIndex = findIndexOfXAfterY(content, '', 'permissionForWorkflowKind =')
-    if (targetIndex === -1) throw new Error(`Could not find the target index for permissionForWorkflowKind in ${FilePaths.UQWorkflowKindPath}`);
-    content.splice(targetIndex, 0, `${tab(1)}${this.workflowKind}->\n${tab(2)+this.permissionKind}`);
+    insertXIntoYAfterZ(content, `${tab(1)}${this.workflowKind}->\n${tab(2)+this.permissionKind}`, '', 'permissionForWorkflowKind =')    
     this.updatedWFKFileContent = content.join('\n');
   } 
 
   private registerSlackChannel() {
     const content = this.updatedWFKFileContent.split('\n');
-    const targetIndex = findIndexOfXAfterY(content, '', 'alertChannelForWorkflowKind =')
-    if (targetIndex === -1) throw new Error(`Could not find the target index for alertChannelForWorkflowKind in ${FilePaths.UQWorkflowKindPath}`);
-    content.splice(targetIndex, 0, `${tab(1)}${this.workflowKind} ->\n${tab(2)}${this.slackName}`);
+    insertXIntoYAfterZ(content, `${tab(1)}${this.workflowKind} ->\n${tab(2)}${this.slackName}`, '','alertChannelForWorkflowKind =' )
     this.updatedWFKFileContent = content.join('\n');
   }
 
@@ -80,19 +76,13 @@ export default class WorkflowInstantiationStep extends BaseStep {
 
   private async updateUtilsFile() {
     const fileContent = fs.readFileSync(FilePaths.UQUtilsFile, 'utf-8').split('\n');
-    const targetIndex = findIndexOfXAfterY(fileContent, 'where', ItemDispositionMarker);
-    if (targetIndex === -1) throw new Error(`Could not properly parse ${FilePaths.UQUtilsFile} file`);
-    fileContent.splice(targetIndex, 0, `${tab(1)}${dispositionAdapter.replaceAll('{{workflow_name}}', this.workflowName)}`);
+    insertXIntoYAfterZ(fileContent, `${tab(1)}${dispositionAdapter.replaceAll('{{workflow_name}}', this.workflowName)}`, 'where', ItemDispositionMarker)
 
     const matchFunctionText = matchFunction.replaceAll('{{workflow_name}}', this.workflowName) + '\n'
-    const targetIndex2 = findIndexOfXAfterY(fileContent, 'where', ItemDispositionMarker);
-    if (targetIndex2 === -1) throw new Error(`Could not properly parse ${FilePaths.UQUtilsFile} file`);
-    fileContent.splice(targetIndex2 + 1, 0, `${matchFunctionText}`);
+    insertXIntoYAfterZ(fileContent, matchFunctionText, 'where', ItemDispositionMarker, 1)
 
     const runWithAdapterText = runWithAdapterLine.replaceAll('{{workflow_name}}', this.workflowName)
-    const targetIndex3 = findIndexOfXAfterY(fileContent, '', 'runWithAdapter itemKind action =');
-    if (targetIndex3 === -1) throw new Error(`Could not properly parse ${FilePaths.UQUtilsFile} file`);
-    fileContent.splice(targetIndex3, 0, `${tab(1)}${runWithAdapterText}`);
+    insertXIntoYAfterZ(fileContent, `${tab(1)}${runWithAdapterText}`, '', 'runWithAdapter itemKind action =')
 
     fs.writeFileSync(FilePaths.UQUtilsFile, fileContent.join('\n'), 'utf-8');
   }
@@ -103,14 +93,8 @@ export default class WorkflowInstantiationStep extends BaseStep {
 
     this.outcomes.forEach(outcome => {
       outcomesFileContent = addNullaryTypeToSumType(outcomesFileContent, 'UnifiedQueueOutcomeKind', outcome.outcome, outcome.description);
-      
-      const targetIndex = findIndexOfXAfterY(outcomesFileContent, '', 'isPendingOutcome = ');
-      if (targetIndex === -1) throw new Error(`Could not find the target index for isPendingOutcome in ${FilePaths.UQOutcomeKindPath}`);
-      outcomesFileContent.splice(targetIndex, 0, `${tab(1)}${outcome.outcome} -> ${outcome.isPending ? 'True' : 'False'}`);
-
-      const targetIndex2 = findIndexOfXAfterY(outcomesFileContent, '', 'outcomeCanBeReActioned =');
-      if (targetIndex2 === -1) throw new Error(`Could not find the target index for outcomeCanBeReActioned in ${FilePaths.UQOutcomeKindPath}`);
-      outcomesFileContent.splice(targetIndex2, 0, `${tab(1)}${outcome.outcome} -> ${outcome.reactionable ? 'True' : 'False'}`);
+      insertXIntoYAfterZ(outcomesFileContent, `${tab(1)}${outcome.outcome} -> ${outcome.isPending ? 'True' : 'False'}`, '', 'isPendingOutcome = ')
+      insertXIntoYAfterZ(outcomesFileContent, `${tab(1)}${outcome.outcome} -> ${outcome.reactionable ? 'True' : 'False'}`, '', 'outcomeCanBeReActioned =')
     })
 
     fs.writeFileSync(FilePaths.UQOutcomeKindPath, outcomesFileContent.join('\n'), 'utf-8');
@@ -119,26 +103,14 @@ export default class WorkflowInstantiationStep extends BaseStep {
   private async updateOutcomeActionHelpersFile() {
     if (this.outcomes.length === 0) return;
     let fileContent = fs.readFileSync(FilePaths.OutcomeActionHelpersPath, 'utf-8').split('\n');
-
-    this.outcomes.forEach(outcome => {
-      const targetIndex = findIndexOfXAfterY(fileContent, '', 'unifiedQueueOutcomeToRiskAlertDecision = ');
-      if (targetIndex === -1) throw new Error(`Could not find the target index for unifiedQueueOutcomeToRiskAlertDecision in ${FilePaths.OutcomeActionHelpersPath}`);
-      fileContent.splice(targetIndex, 0, `${tab(1)}${outcome.outcome} -> RaaOther`);
-    })
-
+    this.outcomes.forEach(outcome => insertXIntoYAfterZ(fileContent, `${tab(1)}${outcome.outcome} -> RaaOther`, '', 'unifiedQueueOutcomeToRiskAlertDecision = '))
     fs.writeFileSync(FilePaths.OutcomeActionHelpersPath, fileContent.join('\n'), 'utf-8');
   }
 
   private async updateOutcomeActionFile() {
     if (this.outcomes.length === 0) return;
     let fileContent = fs.readFileSync(FilePaths.OutcomeActionsFilePath, 'utf-8').split('\n');
-
-    this.outcomes.forEach(outcome => {
-      const targetIndex = findIndexOfXAfterY(fileContent, 'where', 'performOutcomeSideEffect presigner item ');
-      if (targetIndex === -1) throw new Error(`Could not find the target index for unifiedQueueOutcomeToRiskAlertAction in ${FilePaths.OutcomeActionsFilePath}`);
-      fileContent.splice(targetIndex, 0, `${tab(1)}${outcome.outcome} -> doNothing`);
-    })
-
+    this.outcomes.forEach(o => insertXIntoYAfterZ(fileContent, `${tab(1)}${o.outcome} -> doNothing`, 'where', 'performOutcomeSideEffect presigner item '))
     fs.writeFileSync(FilePaths.OutcomeActionsFilePath, fileContent.join('\n'), 'utf-8');
   }
 

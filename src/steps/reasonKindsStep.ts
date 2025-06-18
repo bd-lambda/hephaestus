@@ -4,7 +4,7 @@ import { Prompt, TPromptIndex } from "../types";
 import prompts from "prompts";
 import fs from 'fs';
 import reasonKindTemplateContent from "../templates/reasonKindsTemplate"
-import { addNullaryTypeToSumType, constructSumType, convertPascalCaseToSnakeCase, findIndexOfXAfterY, migrationFileAlreadyCreated, runMigrationCommand, tab, trimStringArr } from "../utils";
+import { addNullaryTypeToSumType, constructSumType, convertPascalCaseToSnakeCase, findIndexOfXAfterY, insertXIntoYAfterZ, migrationFileAlreadyCreated, runMigrationCommand, tab, trimStringArr } from "../utils";
 
 export default class ReasonKindsStep extends BaseStep {
   private fileContent: string[] = [];
@@ -128,11 +128,8 @@ export default class ReasonKindsStep extends BaseStep {
 
     const fileContent = trimStringArr(rawFileContent.split('\n'))
     const updatedContent = [...fileContent, `import ${this.fullModuleName}`]
-    const targetIndex = findIndexOfXAfterY(updatedContent, ')', '(');
-    if (targetIndex === -1) {
-      throw new Error(`Could not find target index to insert import for ${this.fullModuleName}`);
-    }
-    updatedContent.splice(targetIndex, 0, `${tab(2)}${this.moduleName},`);
+
+    insertXIntoYAfterZ(updatedContent, `${tab(2)}${this.moduleName},`, ')', '(');
     fs.writeFileSync(FilePaths.AllReasonKindsPath, updatedContent.join('\n'), 'utf-8');
   }
 
@@ -156,12 +153,8 @@ export default class ReasonKindsStep extends BaseStep {
       `This represents the full disposition reason tree for ${this.readableWorkflowName} workflow.`
     );
 
-    const targetIndex = findIndexOfXAfterY(fileContent, '', 'isConfirmedLargeFraud =');
-    fileContent.splice(targetIndex, 0, `${tab(1)}${uqName} _ -> False`);
-
-    const targetIndex2 = findIndexOfXAfterY(fileContent, '', 'isSuspectedLargeFraud =');
-    fileContent.splice(targetIndex2, 0, `${tab(1)}${uqName} _ -> False`);
-
+    insertXIntoYAfterZ(fileContent, `${tab(1)}${uqName} _ -> False`, '', 'isConfirmedLargeFraud =');
+    insertXIntoYAfterZ(fileContent, `${tab(1)}${uqName} _ -> False`, '', 'isSuspectedLargeFraud =')
     fs.writeFileSync(FilePaths.UQReasonKinds, fileContent.join('\n'), 'utf-8');
   }
 

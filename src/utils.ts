@@ -212,6 +212,13 @@ export const addNullaryTypeToSumType = (fileContent: string[], dataTypeName: str
   return fileContent;
 }
 
+export const insertXIntoYAfterZ = (fileContent: string[], x: string, y: string, z: string, offset: number = 0) => {
+  const targetIndex = findIndexOfXAfterY(fileContent, y, z);
+  if (targetIndex === -1) throw new Error(`Could not find the target index`);
+  fileContent.splice(targetIndex + offset, 0, x);
+  return fileContent
+}
+
 export const runCli = () => {
   const r = repl.start({
     prompt: 'vulcan> ',
@@ -236,4 +243,5 @@ export const runCli = () => {
   r.context.fetchSlackChannels = fetchSlackChannels;
   r.context.extractSumTypesFromFile = extractSumTypesFromFile;
   r.context.addNullaryTypeToSumType = addNullaryTypeToSumType;
+  r.context.insertXIntoYAfterZ = insertXIntoYAfterZ;
 }

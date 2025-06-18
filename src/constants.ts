@@ -20,7 +20,8 @@ export const FilePaths = {
   UQDispositionVersionPath: './src/Model/UnifiedQueue/UnifiedQueueDispositionVersion.hs',
   UQOutcomeKindPath: './src/Model/UnifiedQueue/UnifiedQueueOutcomeKind.hs',
   OutcomeActionHelpersPath: './src/Mercury/Risk/UnifiedQueue/OutcomeActions/Helpers.hs',
-  OutcomeActionsFilePath: './src/Mercury/Risk/UnifiedQueue/OutcomeActions.hs'
+  OutcomeActionsFilePath: './src/Mercury/Risk/UnifiedQueue/OutcomeActions.hs',
+  TSGenerationFilePath: './src/Mercury/TypeScript/Types/UnifiedQueue.hs'
 }
 
 export const ModulePaths = {

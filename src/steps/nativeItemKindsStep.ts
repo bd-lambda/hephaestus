@@ -1,6 +1,6 @@
 import { TPromptIndex } from "../types";
 import fs from 'fs';
-import { addStringArrayAfterString, capitalize, constructSumType, convertPascalCaseToSnakeCase, findIndexOfXAfterY, migrationFileAlreadyCreated, runMigrationCommand, tab } from "../utils";
+import { addStringArrayAfterString, capitalize, constructSumType, convertPascalCaseToSnakeCase, findIndexOfXAfterY, insertXIntoYAfterZ, migrationFileAlreadyCreated, runMigrationCommand, tab } from "../utils";
 import { derivingStockMarker, FilePaths, ItemKindSuffix, NativeItemKindJSONMarker, NativeItemKindsAlterCommand, NativeItemKindsSuffix, NativeItemKindsTargetMarker, UQItemKindMarker } from "../constants";
 import BaseStep from "./baseStep";
 
@@ -52,10 +52,7 @@ export default class NativeItemKindsStep extends BaseStep {
 
   private generateJSONAndTypescriptForNativeItemKinds() {
     if (this.JSONAndTypescriptAlreadyGenerated()) return;
-
-    const targetIndex = findIndexOfXAfterY(this.updatedContent, "]", NativeItemKindJSONMarker)
-    if (targetIndex === -1) throw new Error(`Target marker "${NativeItemKindJSONMarker}" not found in file.`);
-    this.updatedContent.splice(targetIndex, 0, `${tab(1)}, ''${this.dataTypeName}`);
+    insertXIntoYAfterZ(this.updatedContent, `${tab(1)}, ''${this.dataTypeName}`, ']', NativeItemKindJSONMarker);
   }
 
   private writeUpdatedContentToFile() {
@@ -142,12 +139,9 @@ export default class NativeItemKindsStep extends BaseStep {
 
   private registerItemKindInUQItemKindFile() {
     const contentArr = fs.readFileSync(FilePaths.UQItemKindPath, 'utf-8').split('\n');
-    const targetIndex = findIndexOfXAfterY(contentArr, derivingStockMarker, UQItemKindMarker);
-    if (targetIndex === -1) {
-      throw new Error(`Could not properly parse file: ${FilePaths.UQItemKindPath}`);
-    }
     const newItemKind = `${tab(1)}| UnifiedQueue${this.workflowName + ItemKindSuffix} ${this.dataTypeName}`;
-    contentArr.splice(targetIndex, 0, newItemKind);
+
+    insertXIntoYAfterZ(contentArr, newItemKind, derivingStockMarker, UQItemKindMarker)
     fs.writeFileSync(FilePaths.UQItemKindPath, contentArr.join('\n'), 'utf-8');
   }
 

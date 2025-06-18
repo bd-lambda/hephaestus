@@ -1,4 +1,4 @@
-import { Prompt, TPromptIndex } from "../types";
+import { TPromptIndex } from "../types";
 import fs from 'fs';
 import { addVariantToHaskellDataType, capitalize, tab } from "../utils";
 import { FilePaths } from "../constants";
@@ -18,7 +18,6 @@ export default class WorkflowIntroductionStep extends BaseStep {
   prompts = [this.promptOne];
 
   async stepHandlers() {
-    // this.workflowNameRecieved()
     this.registerUnifiedQueueSubsystem();
   }
 
@@ -31,11 +30,6 @@ export default class WorkflowIntroductionStep extends BaseStep {
   private get promptAnswer(): string | undefined {
     if (this.promptOne.recursive === false) return this.promptOne.answer?.['workflow-name'].trim();
   } 
-
-  private workflowNameRecieved() {
-    this.createVulcanAdpaterInstanceFile()
-    this.logger().adapterFileCreated()
-  }
 
   private registerUnifiedQueueSubsystem() {
     const fileContent = fs.readFileSync(FilePaths.VulcanAdapterClass, 'utf-8'),
@@ -65,10 +59,6 @@ export default class WorkflowIntroductionStep extends BaseStep {
       throw new Error("Workflow name has not been set.");
     }
     return capitalize(this.promptAnswer);
-  }
-
-  private createVulcanAdpaterInstanceFile() {
-    fs.writeFileSync(this.vulcanInstanceFilePath(), '', )
   }
 
   private vulcanInstanceFilePath() {
