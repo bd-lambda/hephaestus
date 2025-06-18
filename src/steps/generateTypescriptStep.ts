@@ -52,7 +52,7 @@ export default class GenerateTypescriptStep extends BaseStep {
     insertXIntoYAfterZ(fileContent, `${tab(1)}writeCore @${this.workflowName}Reason`, '', '-- subsystem item kind.')
     insertXIntoYAfterZ(fileContent, `${tab(1)}writeCore @${this.workflowName}Disposition`, '', '-- disposition api types')
     insertXIntoYAfterZ(fileContent, `${tab(1)}writeCore @${this.workflowName}DispositionV1Data`, '', '-- disposition api types')
-    insertXIntoYAfterZ(fileContent, `${tab(1)}writeCore @${this.workflowName}DetailsData`, '', '-- details data')
+    insertXIntoYAfterZ(fileContent, `${tab(1)}writeCore @UnifiedQueue${this.workflowName}DetailsData`, '', '-- details data')
     this.reasonOptions.forEach(o => insertXIntoYAfterZ(fileContent, `${tab(1)}writeCore @${o}`, '', '-- subsystem reason enums'))
     
     fs.writeFileSync(FilePaths.TSGenerationFilePath, fileContent.join('\n'));
